@@ -15,18 +15,31 @@ import {
   DialogContent,
   DialogActions,
   Chip,
-  useTheme
+  useTheme,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { 
   Edit as EditIcon, 
   Add as AddIcon,
-  Spa as CategoryIcon 
+  Spa as CategoryIcon,
+  MoreVert as MoreIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
-import { createCategory, updateCategory } from '../services/api';
+import { createCategory, updateCategory, deleteCategory } from '../services/api';
 
 const CategoryManager = ({ categories, onCategoriesUpdate }) => {
   const [open, setOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -58,18 +71,75 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
     setEditingCategory(null);
   };
 
+  const handleMenuOpen = (event, category) => {
+    setMenuAnchor(event.currentTarget);
+    setSelectedCategory(category);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setSelectedCategory(null);
+  };
+
+  const handleDeleteClick = (category) => {
+    setCategoryToDelete(category);
+    setDeleteDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteCategory(categoryToDelete.id);
+      setSnackbar({
+        open: true,
+        message: 'Category deleted successfully',
+        severity: 'success'
+      });
+      onCategoriesUpdate();
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error deleting category',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setCategoryToDelete(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, formData);
+        setSnackbar({
+          open: true,
+          message: 'Category updated successfully',
+          severity: 'success'
+        });
       } else {
         await createCategory(formData);
+        setSnackbar({
+          open: true,
+          message: 'Category created successfully',
+          severity: 'success'
+        });
       }
       onCategoriesUpdate();
       handleClose();
     } catch (error) {
       console.error('Error saving category:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error saving category',
+        severity: 'error'
+      });
     }
   };
 
@@ -79,6 +149,10 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   return (
@@ -148,10 +222,10 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
                     }}
                   />
                   <IconButton
-                    onClick={() => handleOpen(category)}
+                    onClick={(e) => handleMenuOpen(e, category)}
                     size="small"
                   >
-                    <EditIcon fontSize="small" />
+                    <MoreIcon fontSize="small" />
                   </IconButton>
                 </Box>
 
@@ -185,8 +259,22 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
                       <Switch
                         checked={category.published}
                         onChange={async () => {
-                          await updateCategory(category.id, { published: !category.published });
-                          onCategoriesUpdate();
+                          try {
+                            await updateCategory(category.id, { published: !category.published });
+                            setSnackbar({
+                              open: true,
+                              message: `Category ${!category.published ? 'published' : 'unpublished'}`,
+                              severity: 'success'
+                            });
+                            onCategoriesUpdate();
+                          } catch (error) {
+                            console.error('Error updating category:', error);
+                            setSnackbar({
+                              open: true,
+                              message: 'Error updating category',
+                              severity: 'error'
+                            });
+                          }
                         }}
                         color="primary"
                       />
@@ -199,6 +287,29 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Category Menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={() => {
+          handleOpen(selectedCategory);
+          handleMenuClose();
+        }}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleDeleteClick(selectedCategory)} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Add/Edit Dialog */}
       <Dialog
@@ -273,6 +384,57 @@ const CategoryManager = ({ categories, onCategoriesUpdate }) => {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{
+          backgroundColor: 'error.main',
+          color: 'white',
+          fontWeight: 600
+        }}>
+          Confirm Delete
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography>
+            Are you sure you want to delete the category "{categoryToDelete?.name}"? 
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={handleDeleteCancel} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            variant="contained" 
+            color="error"
+            autoFocus
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -10,20 +10,18 @@ import {
   Typography,
   Link,
   CircularProgress,
-  useTheme,
-  AppBar,
-  Toolbar,
   Switch,
-  FormGroup
+  FormGroup,
+  useTheme,
 } from '@mui/material';
 import { DarkMode, LightMode } from '@mui/icons-material';
 import logo from '../assets/vblogo.png';
 
-const LoginPage = (props) => {
+const LoginPage = ({ onLogin, toggleTheme }) => {
   const [formData, setFormData] = useState({
-    email: '',
+    email: 'secdamngood@gmail.com',
     password: '',
-    rememberMe: false
+    rememberMe: false,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -31,55 +29,55 @@ const LoginPage = (props) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
-    
+
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: ''
+        [name]: '',
       }));
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      if (formData.email !== "vbadmun@gmail.com" || formData.password !== "123456") {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (formData.email !== 'secdamngood@gmail.com' || formData.password !== '123123') {
         setErrors({ submit: 'Login failed. Please try again.' });
         return;
       }
-      props.onLogin();
+      onLogin();
     } catch (error) {
       setErrors({ submit: 'Login failed. Please try again.' });
-      console.log("printing err",error)
+      console.error('Login error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,25 +87,24 @@ const LoginPage = (props) => {
     <Box
       sx={{
         minHeight: '100vh',
-        background: theme.palette.gradient?.primary,
+        background: theme.palette.gradient?.primary || `linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 2
+        p: 3,
       }}
     >
       <Card
         sx={{
-          maxWidth: 440,
-          width: '100%',
-          background: theme.palette.background.paper,
+          width: 440,
           borderRadius: 3,
-          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-          border: `1px solid ${theme.palette.mode === 'light' ? '#f1f5f9' : '#27272a'}`,
+          boxShadow: theme.shadows[5],
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.paper,
         }}
       >
-        <CardContent sx={{ p: 4 }}>
-          {/* Logo Section */}
+        <CardContent sx={{ p: 5 }}>
+          {/* Logo & Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Box
               component="img"
@@ -117,36 +114,33 @@ const LoginPage = (props) => {
                 width: 80,
                 height: 80,
                 borderRadius: '50%',
-                objectFit: 'cover',
-                border: `3px solid ${theme.palette.primary.main}`,
+                border: `3px solid ${theme.palette.secondary.main}`,
+                margin:'auto',
+                mb: 2,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                mb: 2
+                objectFit: 'cover',
               }}
             />
             <Typography
               variant="h4"
-              component="h1"
               sx={{
-                fontWeight: 600,
-                background: theme.palette.gradient?.primary,
+                fontWeight: 700,
+                background: theme.palette.gradient?.primary || `linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)`,
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                mb: 1
+                mb: 1,
               }}
             >
-              Mindful Moments
+              Visually Becoming
             </Typography>
-            <Typography
-              variant="body1"
-              color="text.secondary"
-            >
+            <Typography color="text.secondary">
               Welcome back! Please sign in to your account.
             </Typography>
           </Box>
 
-          {/* Login Form */}
-          <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
+          {/* Form */}
+          <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               fullWidth
               label="Email Address"
@@ -157,10 +151,10 @@ const LoginPage = (props) => {
               error={!!errors.email}
               helperText={errors.email}
               placeholder="Enter your email"
-              sx={{ mb: 2 }}
-              InputProps={{
-                sx: { borderRadius: 2 }
-              }}
+              sx={{ mb: 3 }}
+              InputProps={{ sx: { borderRadius: 2 } }}
+              disabled={isLoading}
+              autoFocus
             />
 
             <TextField
@@ -173,24 +167,26 @@ const LoginPage = (props) => {
               error={!!errors.password}
               helperText={errors.password}
               placeholder="Enter your password"
-              sx={{ mb: 1 }}
-              InputProps={{
-                sx: { borderRadius: 2 }
-              }}
+              sx={{ mb: 2 }}
+              InputProps={{ sx: { borderRadius: 2 } }}
+              disabled={isLoading}
             />
 
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 2 
-            }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+              }}
+            >
               <FormControlLabel
                 control={
                   <Checkbox
                     name="rememberMe"
                     checked={formData.rememberMe}
                     onChange={handleChange}
+                    disabled={isLoading}
                     sx={{
                       color: theme.palette.primary.main,
                       '&.Mui-checked': {
@@ -202,15 +198,13 @@ const LoginPage = (props) => {
                 label="Remember me"
                 sx={{ color: 'text.secondary' }}
               />
-              <Link 
-                href="#" 
+              <Link
+                href="#"
                 variant="body2"
-                sx={{ 
-                  textDecoration: 'none',
+                sx={{
                   color: 'primary.main',
-                  '&:hover': {
-                    color: 'primary.dark'
-                  }
+                  textDecoration: 'none',
+                  '&:hover': { color: 'primary.dark' },
                 }}
               >
                 Forgot password?
@@ -222,12 +216,12 @@ const LoginPage = (props) => {
                 color="error"
                 variant="body2"
                 sx={{
-                  textAlign: 'center',
-                  mb: 2,
-                  p: 1,
+                  mb: 3,
+                  p: 1.5,
                   borderRadius: 1,
-                  backgroundColor: 'error.light',
-                  color: 'error.dark'
+                  backgroundColor: theme.palette.error.light,
+                  color: theme.palette.error.dark,
+                  textAlign: 'center',
                 }}
               >
                 {errors.submit}
@@ -240,65 +234,65 @@ const LoginPage = (props) => {
               variant="contained"
               disabled={isLoading}
               sx={{
-                py: 1.5,
+                py: 1.8,
                 borderRadius: 2,
                 textTransform: 'uppercase',
-                fontWeight: 500,
-                fontSize: '0.875rem',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                transition: 'all 0.3s ease',
                 '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                  transform: 'translateY(-3px)',
+                  boxShadow: '0 6px 14px rgba(34, 197, 94, 0.4)',
                 },
               }}
             >
               {isLoading ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'white', justifyContent: 'center' }}>
                   <CircularProgress size={20} sx={{ color: 'white' }} />
                   Signing in...
                 </Box>
               ) : (
-                'Sign in'
+                'Sign In'
               )}
             </Button>
           </Box>
 
-          <Box sx={{ textAlign: 'center', mb: 2 }}>
+          {/* Signup Link */}
+          {/* <Box sx={{ textAlign: 'center', mt: 3 }}>
             <Typography variant="body2" color="text.secondary">
               Don't have an account?{' '}
-              <Link 
-                href="#" 
-                sx={{ 
-                  textDecoration: 'none',
+              <Link
+                href="#"
+                sx={{
                   color: 'primary.main',
-                  fontWeight: 500,
-                  '&:hover': {
-                    color: 'primary.dark'
-                  }
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  '&:hover': { color: 'primary.dark' },
                 }}
               >
                 Sign up
               </Link>
             </Typography>
-          </Box>
+          </Box> */}
 
           {/* Theme Toggle */}
-          <FormGroup sx={{ textAlign: 'center' }}>
+          {/* <FormGroup sx={{ mt: 4, justifyContent: 'center', display: 'flex' }}>
             <FormControlLabel
               control={
                 <Switch
                   checked={theme.palette.mode === 'dark'}
-                  onChange={props.toggleTheme}
-                  icon={<LightMode sx={{ fontSize: 16 }} />}
-                  checkedIcon={<DarkMode sx={{ fontSize: 16 }} />}
+                  onChange={toggleTheme}
+                  icon={<LightMode sx={{ fontSize: 18 }} />}
+                  checkedIcon={<DarkMode sx={{ fontSize: 18 }} />}
                 />
               }
               label={
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ userSelect: 'none' }}>
                   {theme.palette.mode === 'dark' ? 'Dark Mode' : 'Light Mode'}
                 </Typography>
               }
             />
-          </FormGroup>
+          </FormGroup> */}
         </CardContent>
       </Card>
     </Box>
