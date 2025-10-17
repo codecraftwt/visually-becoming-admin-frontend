@@ -125,7 +125,7 @@ const GuidedVisualizationsManager = ({ categories }) => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          // onClick={() => handleOpen()}
+          onClick={() => handleOpen()}
         >
           Add Visualization
         </Button>

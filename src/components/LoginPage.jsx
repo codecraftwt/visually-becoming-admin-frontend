@@ -79,6 +79,7 @@ const LoginPage = (props) => {
       props.onLogin();
     } catch (error) {
       setErrors({ submit: 'Login failed. Please try again.' });
+      console.log("printing err",error)
     } finally {
       setIsLoading(false);
     }

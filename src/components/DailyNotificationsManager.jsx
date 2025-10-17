@@ -105,7 +105,7 @@ const DailyNotificationsManager = ({ categories }) => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          // onClick={handleOpen}
+          onClick={handleOpen}
         >
           Add Notification
         </Button>

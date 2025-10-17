@@ -122,7 +122,7 @@ const GuidedAudioManager = ({ categories }) => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          // onClick={() => handleOpen()}
+          onClick={() => handleOpen()}
         >
           Add Audio
         </Button>

@@ -123,7 +123,7 @@ const DailyAffirmationsManager = ({ categories }) => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          // onClick={() => handleOpen()}
+          onClick={() => handleOpen()}
         >
           Add Affirmation
         </Button>

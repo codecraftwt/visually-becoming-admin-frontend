@@ -122,7 +122,7 @@ const GuidedMeditationsManager = ({ categories }) => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          // onClick={() => handleOpen()}
+          onClick={() => handleOpen()}
         >
           Add Meditation
         </Button>
