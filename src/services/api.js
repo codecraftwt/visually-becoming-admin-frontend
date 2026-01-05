@@ -1,6 +1,9 @@
 // visually-becoming-admin-frontend\src\services\api.js
+// visually-becoming-admin-frontend\src\services\api.js
 import axios from 'axios';
 
+
+const API_BASE = import.meta.env.VITE_BASE_FRONTEND_URL || 'http://localhost:5000/api';
 
 const API_BASE = import.meta.env.VITE_BASE_FRONTEND_URL || 'http://localhost:5000/api';
 
@@ -22,6 +25,7 @@ export const api = {
   getDailyAffirmations: () => axios.get(`${API_BASE}/daily-affirmations`).then(res => res.data),
   createDailyAffirmation: (data) => axios.post(`${API_BASE}/daily-affirmations`, data).then(res => res.data),
   updateDailyAffirmation: (id, data) => axios.put(`${API_BASE}/daily-affirmations/${id}`, data).then(res => res.data),
+  deleteDailyAffirmation: (id) => axios.delete(`${API_BASE}/daily-affirmations/${id}`).then(res => res.data),
   deleteDailyAffirmation: (id) => axios.delete(`${API_BASE}/daily-affirmations/${id}`).then(res => res.data),
   // Guided Audio
   getGuidedAudio: () => axios.get(`${API_BASE}/guided-audio`).then(res => res.data),
@@ -58,6 +62,7 @@ export const api = {
 
 export const {
   // categories
+  // categories
   getCategories,
   createCategory,
   updateCategory,
@@ -76,6 +81,9 @@ export const {
   deleteDailyAffirmation,
 
   // guided audio
+  deleteDailyAffirmation,
+
+  // guided audio
   getGuidedAudio,
   getGuidedAudioByCategory,
   createGuidedAudio,
@@ -88,13 +96,19 @@ export const {
   updateGuidedMeditation,
 
   // guided visualizations
+
+  // guided visualizations
   getGuidedVisualizations,
   createGuidedVisualization,
   updateGuidedVisualization,
 
   // daily notifications
+
+  // daily notifications
   getDailyNotifications,
   createDailyNotification,
+
+  // today's content
 
   // today's content
   getTodayContent,
