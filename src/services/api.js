@@ -11,6 +11,12 @@ export const api = {
   updateCategory: (id, data) => axios.put(`${API_BASE}/categories/${id}`, data).then(res => res.data),
   deleteCategory: (id) => axios.delete(`${API_BASE}/categories/${id}`).then(res => res.data),
 
+  // Audio Categories
+  getAudioCategories: () => axios.get(`${API_BASE}/audio-categories`).then(res => res.data),
+  createAudioCategory: (data) => axios.post(`${API_BASE}/audio-categories`, data).then(res => res.data),
+  updateAudioCategory: (id, data) => axios.put(`${API_BASE}/audio-categories/${id}`, data).then(res => res.data),
+  deleteAudioCategory: (id) => axios.delete(`${API_BASE}/audio-categories/${id}`).then(res => res.data),
+
 
   // Daily Affirmations
   getDailyAffirmations: () => axios.get(`${API_BASE}/daily-affirmations`).then(res => res.data),
@@ -19,8 +25,18 @@ export const api = {
   deleteDailyAffirmation: (id) => axios.delete(`${API_BASE}/daily-affirmations/${id}`).then(res => res.data),
   // Guided Audio
   getGuidedAudio: () => axios.get(`${API_BASE}/guided-audio`).then(res => res.data),
-  createGuidedAudio: (data) => axios.post(`${API_BASE}/guided-audio`, data).then(res => res.data),
-  updateGuidedAudio: (id, data) => axios.put(`${API_BASE}/guided-audio/${id}`, data).then(res => res.data),
+  getGuidedAudioByCategory: (categoryId) => axios.get(`${API_BASE}/guided-audio/category/${categoryId}`).then(res => res.data),
+  createGuidedAudio: (data) => {
+    const isFormData = data instanceof FormData;
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return axios.post(`${API_BASE}/guided-audio`, data, config).then(res => res.data);
+  },
+  updateGuidedAudio: (id, data) => {
+    const isFormData = data instanceof FormData;
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return axios.put(`${API_BASE}/guided-audio/${id}`, data, config).then(res => res.data);
+  },
+  deleteGuidedAudio: (id) => axios.delete(`${API_BASE}/guided-audio/${id}`).then(res => res.data),
 
   // Guided Meditations
   getGuidedMeditations: () => axios.get(`${API_BASE}/guided-meditations`).then(res => res.data),
@@ -47,6 +63,12 @@ export const {
   updateCategory,
   deleteCategory,
 
+  // audio categories
+  getAudioCategories,
+  createAudioCategory,
+  updateAudioCategory,
+  deleteAudioCategory,
+
   // daily affirmations
   getDailyAffirmations,
   createDailyAffirmation,
@@ -55,8 +77,10 @@ export const {
 
   // guided audio
   getGuidedAudio,
+  getGuidedAudioByCategory,
   createGuidedAudio,
   updateGuidedAudio,
+  deleteGuidedAudio,
 
   // guided meditations
   getGuidedMeditations,

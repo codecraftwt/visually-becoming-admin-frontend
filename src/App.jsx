@@ -58,7 +58,7 @@ function App() {
   const [tabValue, setTabValue] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [categories, setCategories] = useState([]);
-  const [Login, setLogin] = useState(false);
+  const [Login, setLogin] = useState(true); // Temporarily set to true for debugging
   
   // Responsive Design
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -298,10 +298,7 @@ function App() {
               </TabPanel>
               
               <TabPanel value={tabValue} index={4}>
-                <GuidedAudioManager 
-                  categories={categories} 
-                  onDataUpdate={loadCategories}
-                />
+                <GuidedAudioManager />
               </TabPanel>
               
               <TabPanel value={tabValue} index={5}>
