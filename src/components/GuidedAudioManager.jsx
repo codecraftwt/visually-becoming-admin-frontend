@@ -28,7 +28,15 @@ import {
   RadioGroup,
   Radio,
   FormLabel,
-  Slider
+  Slider,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  Skeleton,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -46,7 +54,10 @@ import {
   Delete as DeleteIcon,
   Restore as RestoreIcon,
   VolumeOff as VolumeOffIcon,
-  VolumeUp as VolumeUpIcon
+  VolumeUp as VolumeUpIcon,
+  ViewModule as CardViewIcon,
+  ViewList as TableViewIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import {
   getAudioCategories,
@@ -63,6 +74,8 @@ const GuidedAudioManager = () => {
   const [audioCategories, setAudioCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [audioItems, setAudioItems] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingAudioItems, setLoadingAudioItems] = useState(false);
   const [open, setOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -112,6 +125,11 @@ const GuidedAudioManager = () => {
   const theme = useTheme();
   const fileInputRef = useRef(null);
 
+  // View and search state
+  const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+
   useEffect(() => {
     console.log('GuidedAudioManager mounted');
     loadAudioCategories();
@@ -129,17 +147,27 @@ const GuidedAudioManager = () => {
 
   const loadAudioCategories = async () => {
     try {
+      setLoadingCategories(true);
       console.log('Loading audio categories...');
       const data = await getAudioCategories();
       console.log('Audio categories loaded:', data);
+      // Verify itemCount is present
+      data.forEach(cat => {
+        if (cat.itemCount === undefined) {
+          console.warn(`Category ${cat.name} (${cat.id}) missing itemCount`);
+        }
+      });
       setAudioCategories(data);
     } catch (error) {
       console.error('Error loading audio categories:', error);
+    } finally {
+      setLoadingCategories(false);
     }
   };
 
   const loadAudioItems = async (categoryId) => {
     try {
+      setLoadingAudioItems(true);
       console.log('Loading audio items for category:', categoryId);
       const data = await getGuidedAudioByCategory(categoryId);
       console.log('Audio items loaded:', data);
@@ -163,6 +191,8 @@ const GuidedAudioManager = () => {
       setCardAudioStates(newStates);
     } catch (error) {
       console.error('Error loading audio items:', error);
+    } finally {
+      setLoadingAudioItems(false);
     }
   };
 
@@ -1003,7 +1033,11 @@ const GuidedAudioManager = () => {
             <Link
               component="button"
               variant="body1"
-              onClick={handleBackToCategories}
+              onClick={() => {
+                setSelectedCategory(null);
+                setAudioItems([]);
+                setSearchQuery('');
+              }}
               sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
             >
               <CategoryIcon sx={{ mr: 0.5 }} fontSize="small" />
@@ -1047,13 +1081,53 @@ const GuidedAudioManager = () => {
       </Box>
 
       {/* Audio Categories Section */}
-      <Box sx={{ mb: 6 }}>
-        {/* <Typography variant="h5" gutterBottom fontWeight="600" sx={{ mb: 3 }}>
-          Audio Categories
-        </Typography> */}
-        
-        {/* Published Categories */}
-        {audioCategories.filter(cat => cat.isPublished).length > 0 && (
+      {!selectedCategory && (
+        <Box sx={{ mb: 6 }}>
+          {/* Search Bar */}
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              fullWidth
+              placeholder="Search audio categories..."
+              value={categorySearchQuery}
+              onChange={(e) => setCategorySearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+            />
+          </Box>
+
+          {/* Loading Skeleton */}
+          {loadingCategories && (
+            <Grid container spacing={2} sx={{ mb: 4 }}>
+              {[1, 2, 3, 4].map((i) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+                  <Card>
+                    <CardContent>
+                      <Skeleton variant="text" width="60%" height={24} sx={{ mb: 1 }} />
+                      <Skeleton variant="text" width="40%" height={20} sx={{ mb: 2 }} />
+                      <Skeleton variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 1 }} />
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                        <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+                        <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+
+          {/* Published Categories */}
+          {!loadingCategories && audioCategories
+            .filter(cat => {
+              if (!categorySearchQuery) return cat.isPublished;
+              const query = categorySearchQuery.toLowerCase();
+              return cat.isPublished && (
+                cat.name.toLowerCase().includes(query) || 
+                (cat.description && cat.description.toLowerCase().includes(query))
+              );
+            })
+            .length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Typography variant="h6" fontWeight="600" color="primary">
@@ -1062,7 +1136,14 @@ const GuidedAudioManager = () => {
             </Box>
             <Grid container spacing={2}>
               {audioCategories
-                .filter(category => category.isPublished)
+                .filter(category => {
+                  if (!categorySearchQuery) return category.isPublished;
+                  const query = categorySearchQuery.toLowerCase();
+                  return category.isPublished && (
+                    category.name.toLowerCase().includes(query) || 
+                    (category.description && category.description.toLowerCase().includes(query))
+                  );
+                })
                 .map((category) => (
                   <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
                     <Card
@@ -1091,16 +1172,24 @@ const GuidedAudioManager = () => {
                       onClick={() => handleCategorySelect(category)}
                     >
                       <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                        <Typography 
-                          variant="subtitle1" 
-                          fontWeight="600" 
-                          sx={{ 
-                            mb: 0.5,
-                            color: 'text.primary'
-                          }}
-                        >
-                          {category.name}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography 
+                            variant="subtitle1" 
+                            fontWeight="600" 
+                            sx={{ 
+                              color: 'text.primary'
+                            }}
+                          >
+                            {category.name}
+                          </Typography>
+                          <Chip
+                            label={`${category.itemCount ?? 0} items`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: '0.65rem' }}
+                          />
+                        </Box>
 
                         {category.description && (
                           <Typography 
@@ -1206,18 +1295,34 @@ const GuidedAudioManager = () => {
           </Box>
         )}
 
-        {/* Unpublished Categories */}
-        {audioCategories.filter(cat => !cat.isPublished).length > 0 && (
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6" fontWeight="600" color="text.secondary">
-                Unpublished
-              </Typography>
-            </Box>
-            <Grid container spacing={2}>
-              {audioCategories
-                .filter(category => !category.isPublished)
-                .map((category) => (
+          {/* Unpublished Categories */}
+          {!loadingCategories && audioCategories
+            .filter(cat => {
+              if (!categorySearchQuery) return !cat.isPublished;
+              const query = categorySearchQuery.toLowerCase();
+              return !cat.isPublished && (
+                cat.name.toLowerCase().includes(query) || 
+                (cat.description && cat.description.toLowerCase().includes(query))
+              );
+            })
+            .length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h6" fontWeight="600" color="text.secondary">
+                  Unpublished
+                </Typography>
+              </Box>
+              <Grid container spacing={2}>
+                {audioCategories
+                  .filter(category => {
+                    if (!categorySearchQuery) return !category.isPublished;
+                    const query = categorySearchQuery.toLowerCase();
+                    return !category.isPublished && (
+                      category.name.toLowerCase().includes(query) || 
+                      (category.description && category.description.toLowerCase().includes(query))
+                    );
+                  })
+                  .map((category) => (
                   <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
                     <Card
                       sx={{
@@ -1245,16 +1350,24 @@ const GuidedAudioManager = () => {
                       onClick={() => handleCategorySelect(category)}
                     >
                       <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                        <Typography 
-                          variant="subtitle1" 
-                          fontWeight="600" 
-                          sx={{ 
-                            mb: 0.5,
-                            color: 'text.primary'
-                          }}
-                        >
-                          {category.name}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography 
+                            variant="subtitle1" 
+                            fontWeight="600" 
+                            sx={{ 
+                              color: 'text.primary'
+                            }}
+                          >
+                            {category.name}
+                          </Typography>
+                          <Chip
+                            label={`${category.itemCount ?? 0} items`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: '0.65rem' }}
+                          />
+                        </Box>
 
                         {category.description && (
                           <Typography 
@@ -1358,86 +1471,152 @@ const GuidedAudioManager = () => {
                 ))}
             </Grid>
           </Box>
-        )}
-      </Box>
+          )}
+
+          {!loadingCategories && audioCategories.filter(cat => {
+            if (!categorySearchQuery) return true;
+            const query = categorySearchQuery.toLowerCase();
+            return cat.name.toLowerCase().includes(query) || 
+                   (cat.description && cat.description.toLowerCase().includes(query));
+          }).length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                {categorySearchQuery 
+                  ? `No categories found matching "${categorySearchQuery}"`
+                  : 'No categories found'
+                }
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* Audio Files Section */}
       {selectedCategory && (
         <Box>
-          <Box sx={{ position: 'relative', mb: 3 }}>
-            <Typography variant="h5" fontWeight="600">
-              Audio Files for "{selectedCategory.name}"
-            </Typography>
-            {audioItems.length === 0 && (
-              <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleAudioOpen()}
-                  sx={{
-                    background: 'linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #16a34a 0%, #0284c7 50%, #7c3aed 100%)',
-                    }
-                  }}
-                >
-                  Add Audio
-                </Button>
-              </Box>
-            )}
-          </Box>
-          {audioItems.length === 0 ? (
-            <Box sx={{ 
-              textAlign: 'center', 
-              py: 8, 
-              px: 3,
-              borderRadius: 2,
-              bgcolor: (theme) => theme.palette.mode === 'dark' 
-                ? 'rgba(255, 255, 255, 0.05)' 
-                : 'grey.50',
-              border: '2px dashed',
-              borderColor: 'divider',
-              transition: 'background-color 0.3s ease'
-            }}>
-              <AudioIcon sx={{ 
-                fontSize: 64, 
-                color: 'text.disabled', 
-                mb: 2,
-                opacity: 0.5
-              }} />
-              <Typography 
-                variant="h6" 
-                color="text.primary" 
-                gutterBottom
-                sx={{ fontWeight: 500 }}
-              >
-                No audio files yet
-              </Typography>
-              <Typography 
-                variant="body2" 
-                color="text.secondary" 
-                sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}
-              >
-                Get started by adding your first audio file to this category
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleAudioOpen()}
-                sx={{
-                  background: 'linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)',
-                  color: 'white',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #16a34a 0%, #0284c7 50%, #7c3aed 100%)',
-                  }
+          {/* Search Bar with View Toggle */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TextField
+                fullWidth
+                placeholder="Search audio files..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
-              >
-                Add Audio
-              </Button>
+              />
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <IconButton
+                  onClick={() => setViewMode('card')}
+                  color={viewMode === 'card' ? 'primary' : 'default'}
+                  size="small"
+                  title="Card View"
+                >
+                  <CardViewIcon />
+                </IconButton>
+                <IconButton
+                  onClick={() => setViewMode('table')}
+                  color={viewMode === 'table' ? 'primary' : 'default'}
+                  size="small"
+                  title="Table View"
+                >
+                  <TableViewIcon />
+                </IconButton>
+              </Box>
             </Box>
-          ) : (
+          </Box>
+
+          {/* Loading Skeleton for Audio Items */}
+          {loadingAudioItems && (
             <Grid container spacing={2}>
-              {audioItems.map((item) => (
+              {[1, 2, 3, 4].map((i) => (
+                <Grid item xs={12} sm={6} md={4} key={i}>
+                  <Card>
+                    <CardContent>
+                      <Skeleton variant="text" width="70%" height={28} sx={{ mb: 1 }} />
+                      <Skeleton variant="text" width="100%" height={20} sx={{ mb: 1 }} />
+                      <Skeleton variant="text" width="80%" height={20} sx={{ mb: 2 }} />
+                      <Skeleton variant="rectangular" height={40} sx={{ borderRadius: 1 }} />
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                        <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+                        <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+
+          {/* Filter items by search */}
+          {!loadingAudioItems && (() => {
+            const filteredItems = audioItems.filter(item => {
+              if (!searchQuery) return true;
+              const query = searchQuery.toLowerCase();
+              return item.title?.toLowerCase().includes(query) || 
+                     item.description?.toLowerCase().includes(query);
+            });
+
+            return filteredItems.length === 0 ? (
+              <Box sx={{ 
+                textAlign: 'center', 
+                py: 8, 
+                px: 3,
+                borderRadius: 2,
+                bgcolor: (theme) => theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.05)' 
+                  : 'grey.50',
+                border: '2px dashed',
+                borderColor: 'divider',
+                transition: 'background-color 0.3s ease'
+              }}>
+                <AudioIcon sx={{ 
+                  fontSize: 64, 
+                  color: 'text.disabled', 
+                  mb: 2,
+                  opacity: 0.5
+                }} />
+                <Typography 
+                  variant="h6" 
+                  color="text.primary" 
+                  gutterBottom
+                  sx={{ fontWeight: 500 }}
+                >
+                  {audioItems.length === 0 
+                    ? 'No audio files yet'
+                    : `No audio files found matching "${searchQuery}"`
+                  }
+                </Typography>
+                {audioItems.length === 0 && (
+                  <>
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary" 
+                      sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}
+                    >
+                      Get started by adding your first audio file to this category
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => handleAudioOpen()}
+                      sx={{
+                        background: 'linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #16a34a 0%, #0284c7 50%, #7c3aed 100%)',
+                        }
+                      }}
+                    >
+                      Add Audio
+                    </Button>
+                  </>
+                )}
+              </Box>
+            ) : viewMode === 'card' ? (
+              <Grid container spacing={2}>
+                {filteredItems.map((item) => (
                 <Grid item xs={12} sm={6} md={4} key={item.id}>
                   <Card
                     sx={{
@@ -1689,7 +1868,42 @@ const GuidedAudioManager = () => {
                 </Grid>
               ))}
             </Grid>
-          )}
+            ) : (
+              <AudioTableView
+                items={filteredItems}
+                onEdit={handleAudioOpen}
+                onDelete={(item) => {
+                  if (window.confirm(`Are you sure you want to delete "${item.title}"?`)) {
+                    setSelectedAudioItem(item);
+                    handleAudioDelete();
+                  }
+                }}
+                onTogglePublished={handleAudioTogglePublished}
+                onTogglePremium={handleAudioTogglePremium}
+              />
+            );
+          })()}
+
+          {/* Back to Categories Button - Bottom Right */}
+          <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+            <Button
+              variant="contained"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => {
+                setSelectedCategory(null);
+                setAudioItems([]);
+                setSearchQuery('');
+              }}
+              sx={{
+                boxShadow: 3,
+                '&:hover': {
+                  boxShadow: 6,
+                }
+              }}
+            >
+              Back to Categories
+            </Button>
+          </Box>
         </Box>
       )}
 
@@ -2430,6 +2644,81 @@ const GuidedAudioManager = () => {
         </form>
       </Dialog>
     </Box>
+  );
+};
+
+// Audio Table View Component
+const AudioTableView = ({ items, onEdit, onDelete, onTogglePublished, onTogglePremium }) => {
+  return (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Title</TableCell>
+            <TableCell>Description</TableCell>
+            <TableCell>Audio Files</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow key={item.id} hover>
+              <TableCell>
+                <Typography fontWeight="500">{item.title}</Typography>
+              </TableCell>
+              <TableCell>
+                <Typography variant="body2" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.description || '-'}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <Typography variant="body2" color="text.secondary">
+                  {item.audio?.length || 0} {item.audio?.length === 1 ? 'file' : 'files'}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  <Chip
+                    label={item.isPublished ? 'Published' : 'Unpublished'}
+                    color={item.isPublished ? 'primary' : 'default'}
+                    size="small"
+                    onClick={() => onTogglePublished(item)}
+                    sx={{ cursor: 'pointer', height: 22, fontSize: '0.7rem' }}
+                  />
+                  <Chip
+                    label="Premium"
+                    color={item.isPremium ? 'secondary' : 'default'}
+                    size="small"
+                    variant={item.isPremium ? 'filled' : 'outlined'}
+                    onClick={() => onTogglePremium(item)}
+                    sx={{ cursor: 'pointer', height: 22, fontSize: '0.7rem' }}
+                  />
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => onEdit(item)}
+                    color="primary"
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => onDelete(item)}
+                    color="error"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 

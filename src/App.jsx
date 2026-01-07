@@ -329,7 +329,7 @@ function App() {
           <Box
             component="footer"
             sx={{
-              py: { xs: 1.5, sm: 2 },
+              py: { xs: .4, sm: 0.4 },
               px: { xs: 2, sm: 3 },
               mt: 'auto',
               backgroundColor: 'background.paper',
@@ -341,7 +341,7 @@ function App() {
               variant="body2"
               color="text.secondary"
               align="center"
-              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+              sx={{ fontSize: { xs: '0.65rem', sm: '0.675rem' } }}
             >
               Visually Becoming Admin Dashboard • {new Date().getFullYear()}
             </Typography>
