@@ -52,18 +52,26 @@ export const getContentByCategory = (contentType, categoryId) => {
 /**
  * Create a content item
  */
-export const createContent = (contentType, data) => {
+export const createContent = (contentType, data, onUploadProgress, signal) => {
   const isFormData = data instanceof FormData;
-  const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+  const config = {
+    ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+    ...(onUploadProgress ? { onUploadProgress } : {}),
+    ...(signal ? { signal } : {})
+  };
   return axios.post(`${API_BASE}/${contentType}`, data, config).then(res => res.data);
 };
 
 /**
  * Update a content item
  */
-export const updateContent = (contentType, id, data) => {
+export const updateContent = (contentType, id, data, onUploadProgress, signal) => {
   const isFormData = data instanceof FormData;
-  const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+  const config = {
+    ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+    ...(onUploadProgress ? { onUploadProgress } : {}),
+    ...(signal ? { signal } : {})
+  };
   return axios.put(`${API_BASE}/${contentType}/${id}`, data, config).then(res => res.data);
 };
 

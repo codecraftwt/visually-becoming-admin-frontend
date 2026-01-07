@@ -25,14 +25,22 @@ export const api = {
   // Guided Audio
   getGuidedAudio: () => axios.get(`${API_BASE}/guided-audio`).then(res => res.data),
   getGuidedAudioByCategory: (categoryId) => axios.get(`${API_BASE}/guided-audio/category/${categoryId}`).then(res => res.data),
-  createGuidedAudio: (data) => {
+  createGuidedAudio: (data, onUploadProgress, signal) => {
     const isFormData = data instanceof FormData;
-    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    const config = {
+      ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+      ...(onUploadProgress ? { onUploadProgress } : {}),
+      ...(signal ? { signal } : {})
+    };
     return axios.post(`${API_BASE}/guided-audio`, data, config).then(res => res.data);
   },
-  updateGuidedAudio: (id, data) => {
+  updateGuidedAudio: (id, data, onUploadProgress, signal) => {
     const isFormData = data instanceof FormData;
-    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    const config = {
+      ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+      ...(onUploadProgress ? { onUploadProgress } : {}),
+      ...(signal ? { signal } : {})
+    };
     return axios.put(`${API_BASE}/guided-audio/${id}`, data, config).then(res => res.data);
   },
   deleteGuidedAudio: (id) => axios.delete(`${API_BASE}/guided-audio/${id}`).then(res => res.data),

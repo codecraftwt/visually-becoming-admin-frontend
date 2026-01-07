@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import {
   Box,
   Button,
@@ -47,6 +48,9 @@ import {
   TableCell,
   Paper,
   Skeleton,
+  LinearProgress,
+  Backdrop,
+  Alert,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -66,6 +70,7 @@ import {
   ViewModule as CardViewIcon,
   ViewList as TableViewIcon,
   Search as SearchIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
 import {
   getCategories,
@@ -79,6 +84,9 @@ import {
 } from '../../services/guidedContentApi';
 import { getContentTypeConfig } from '../../config/contentTypeConfig';
 import GuidedMediaRenderer from './GuidedMediaRenderer';
+
+// Maximum file size: 200MB
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB in bytes
 
 const GuidedContentManager = ({ contentType }) => {
   // Validate contentType
@@ -100,6 +108,14 @@ const GuidedContentManager = ({ contentType }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState(0); // bytes per second
+  const [timeRemaining, setTimeRemaining] = useState(0); // seconds
+  const [uploadStartTime, setUploadStartTime] = useState(null);
+  const [uploadCancelController, setUploadCancelController] = useState(null);
+  const [totalFileSize, setTotalFileSize] = useState(0);
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [fileSizeErrors, setFileSizeErrors] = useState([]); // Track files that exceed size limit
   const [itemMenuAnchor, setItemMenuAnchor] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [categoryMenuAnchor, setCategoryMenuAnchor] = useState(null);
@@ -372,9 +388,141 @@ const GuidedContentManager = ({ contentType }) => {
     setEditingItem(null);
   };
 
+  const handleCancelUpload = () => {
+    if (uploadCancelController) {
+      uploadCancelController.abort();
+      setUploadCancelController(null);
+    }
+    setUploading(false);
+    setUploadProgress(0);
+    setUploadSpeed(0);
+    setTimeRemaining(0);
+    setUploadedBytes(0);
+    setTotalFileSize(0);
+    setUploadStartTime(null);
+  };
+
   const handleItemSubmit = async (e) => {
     e.preventDefault();
+
+    // Calculate total file size for progress tracking
+    const activePreviews = localFilePreviews.filter(p => p.status === 'active');
+    const totalSize = activePreviews.reduce((sum, preview) => sum + (preview.file?.size || 0), 0);
+    
+    if (totalSize === 0 && activePreviews.length === 0) {
+      // No files to upload, proceed without progress tracking
+      setUploading(true);
+      try {
+        const submitData = new FormData();
+        submitData.append('title', formData.title);
+        submitData.append('description', formData.description);
+        submitData.append('categoryId', formData.categoryId);
+        submitData.append('categoryName', formData.categoryName);
+        submitData.append('isPublished', formData.isPublished);
+        submitData.append('isPremium', formData.isPremium);
+
+        const existingMedia = formData.media || [];
+        const genders = formData.genders || [];
+
+        existingMedia.forEach((mediaItem, index) => {
+          if (!deletedExistingMedia.includes(index)) {
+            const updatedGender = genders[index] || mediaItem.gender || 'male';
+            submitData.append('existingMedia', JSON.stringify({
+              ...mediaItem,
+              gender: updatedGender === 'male' ? 'm' : 'f',
+            }));
+          }
+        });
+
+        if (deletedExistingMedia.length > 0) {
+          submitData.append('deletedMediaIndices', JSON.stringify(deletedExistingMedia));
+        }
+
+        if (config.supportsYouTube && formData.youtubeUrls && formData.youtubeUrls.length > 0) {
+          formData.youtubeUrls.forEach(url => {
+            if (url) submitData.append('youtubeUrls', url);
+          });
+        }
+
+        if (editingItem) {
+          await updateContent(contentType, editingItem.id, submitData);
+        } else {
+          await createContent(contentType, submitData);
+        }
+
+        await loadContentItems(selectedCategory.id);
+        handleItemClose();
+      } catch (error) {
+        if (error.name !== 'CanceledError') {
+          console.error('Error saving content item:', error);
+          alert('Error saving content item. Please try again.');
+        }
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    // Initialize upload progress tracking
+    setTotalFileSize(totalSize);
+    setUploadedBytes(0);
+    setUploadProgress(0);
+    setUploadSpeed(0);
+    setTimeRemaining(0);
+    setUploadStartTime(Date.now());
     setUploading(true);
+
+    // Create AbortController for cancel functionality
+    const abortController = new AbortController();
+    setUploadCancelController(abortController);
+
+    // Track upload progress
+    let lastLoaded = 0;
+    let lastTime = Date.now();
+
+    const onUploadProgress = (progressEvent) => {
+      // Handle both lengthComputable and non-lengthComputable cases
+      if (progressEvent.lengthComputable && progressEvent.total > 0) {
+        const loaded = progressEvent.loaded;
+        const total = progressEvent.total;
+        
+        // Cap progress at 90% until we get the response (remaining 10% is for server processing/Firebase upload)
+        const rawPercent = (loaded / total) * 100;
+        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
+        
+        setUploadedBytes(loaded);
+        setUploadProgress(percentCompleted);
+
+        // Calculate upload speed
+        const currentTime = Date.now();
+        const timeDiff = (currentTime - lastTime) / 1000; // seconds
+        const bytesDiff = loaded - lastLoaded;
+        
+        if (timeDiff > 0 && bytesDiff > 0) {
+          const speed = bytesDiff / timeDiff; // bytes per second
+          setUploadSpeed(speed);
+          
+          // Calculate time remaining (accounting for 90% cap)
+          const remaining = total - loaded;
+          if (speed > 0) {
+            const remainingSeconds = (remaining / speed) * 1.1; // Add 10% buffer for server processing
+            setTimeRemaining(remainingSeconds);
+          }
+        }
+        
+        lastLoaded = loaded;
+        lastTime = currentTime;
+      } else if (progressEvent.loaded > 0) {
+        // Fallback: estimate progress based on loaded bytes if total is unknown
+        const loaded = progressEvent.loaded;
+        const estimatedTotal = totalSize || loaded * 2; // Rough estimate
+        const rawPercent = (loaded / estimatedTotal) * 100;
+        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
+        
+        setUploadedBytes(loaded);
+        setUploadProgress(percentCompleted);
+      }
+    };
 
     try {
       const submitData = new FormData();
@@ -404,9 +552,7 @@ const GuidedContentManager = ({ contentType }) => {
       }
 
       // Handle new file uploads
-      const activePreviews = localFilePreviews.filter(p => p.status === 'active');
       const existingMediaCount = existingMedia.length;
-
       activePreviews.forEach((preview, index) => {
         submitData.append('mediaFiles', preview.file);
         if (config.supportsGender) {
@@ -422,18 +568,35 @@ const GuidedContentManager = ({ contentType }) => {
       }
 
       if (editingItem) {
-        await updateContent(contentType, editingItem.id, submitData);
+        await updateContent(contentType, editingItem.id, submitData, onUploadProgress, abortController.signal);
+        // Set to 100% when upload completes
+        setUploadProgress(100);
       } else {
-        await createContent(contentType, submitData);
+        await createContent(contentType, submitData, onUploadProgress, abortController.signal);
+        // Set to 100% when upload completes
+        setUploadProgress(100);
       }
 
-      await loadContentItems(selectedCategory.id);
-      handleItemClose();
+      // Small delay to show 100% before closing
+      setTimeout(() => {
+        loadContentItems(selectedCategory.id).then(() => {
+          handleItemClose();
+        });
+      }, 300);
     } catch (error) {
-      console.error('Error saving content item:', error);
-      alert('Error saving content item. Please try again.');
+      if (error.name !== 'CanceledError' && !axios.isCancel(error)) {
+        console.error('Error saving content item:', error);
+        alert('Error saving content item. Please try again.');
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+      setUploadSpeed(0);
+      setTimeRemaining(0);
+      setUploadedBytes(0);
+      setTotalFileSize(0);
+      setUploadStartTime(null);
+      setUploadCancelController(null);
     }
   };
 
@@ -476,13 +639,63 @@ const GuidedContentManager = ({ contentType }) => {
     }
   };
 
+  // Helper functions
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // File handling
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
+    // Validate file sizes
+    const invalidFiles = [];
+    const validFiles = [];
+    
+    files.forEach(file => {
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({
+          name: file.name,
+          size: file.size,
+          sizeMB: (file.size / (1024 * 1024)).toFixed(2)
+        });
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    // Set error messages for invalid files
+    if (invalidFiles.length > 0) {
+      setFileSizeErrors(invalidFiles);
+      // Still allow valid files to be processed
+      if (validFiles.length === 0) {
+        // Reset file input if all files are invalid
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+    } else {
+      setFileSizeErrors([]);
+    }
+
+    // Only process valid files
+    if (validFiles.length === 0) return;
+
     const newPreviews = await Promise.all(
-      files.map(async (file, index) => {
+      validFiles.map(async (file, index) => {
         const previewUrl = URL.createObjectURL(file);
         const audioElement = new Audio(previewUrl);
 
@@ -531,7 +744,7 @@ const GuidedContentManager = ({ contentType }) => {
 
     setFormData(prev => ({
       ...prev,
-      selectedFiles: [...(prev.selectedFiles || []), ...files],
+      selectedFiles: [...(prev.selectedFiles || []), ...validFiles],
       genders: [
         ...(prev.genders || []).slice(0, prev.media?.length || 0),
         ...newPreviews.map(() => 'male'),
@@ -755,13 +968,6 @@ const GuidedContentManager = ({ contentType }) => {
 
   // Helper functions
   const getCardMediaKey = (itemId, mediaIndex) => `${itemId}-${mediaIndex}`;
-
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const normalizeGender = (gender) => {
     if (gender === 'm') return 'male';
@@ -1228,6 +1434,25 @@ const GuidedContentManager = ({ contentType }) => {
               >
                 {config.uploadLabel}
               </Button>
+              
+              {/* File size limit note */}
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                Maximum file size: 200MB per file
+              </Typography>
+
+              {/* File size error messages */}
+              {fileSizeErrors.length > 0 && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  <Typography variant="body2" fontWeight="600" sx={{ mb: 1 }}>
+                    The following files exceed the 200MB limit and were not added:
+                  </Typography>
+                  {fileSizeErrors.map((error, index) => (
+                    <Typography key={index} variant="body2" component="div">
+                      • {error.name} ({error.sizeMB}MB)
+                    </Typography>
+                  ))}
+                </Alert>
+              )}
 
               {/* YouTube URL Input (for visualization type) */}
               {config.supportsYouTube && (
@@ -1788,6 +2013,81 @@ const GuidedContentManager = ({ contentType }) => {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Upload Progress Modal */}
+      <Backdrop
+        open={uploading}
+        sx={{
+          color: '#fff',
+          zIndex: (theme) => theme.zIndex.modal + 1, // Higher than Dialog (modal z-index is 1300)
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        }}
+      >
+        <Paper
+          sx={{
+            p: 4,
+            minWidth: 400,
+            maxWidth: 600,
+            borderRadius: 2,
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
+            Uploading Files...
+          </Typography>
+
+          {/* Progress Bar */}
+          <Box sx={{ mb: 2 }}>
+            <LinearProgress
+              variant="determinate"
+              value={uploadProgress}
+              sx={{
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 5,
+                },
+              }}
+            />
+          </Box>
+
+          {/* Progress Percentage */}
+          <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+            {uploadProgress}%
+          </Typography>
+
+          {/* File Size Info */}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {formatFileSize(uploadedBytes)} / {formatFileSize(totalFileSize)}
+          </Typography>
+
+          {/* Upload Speed */}
+          {uploadSpeed > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Speed: {formatFileSize(uploadSpeed)}/s
+            </Typography>
+          )}
+
+          {/* Time Remaining */}
+          {timeRemaining > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Estimated time remaining: {formatTime(timeRemaining)}
+            </Typography>
+          )}
+
+          {/* Cancel Button */}
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<CancelIcon />}
+            onClick={handleCancelUpload}
+            sx={{ mt: 2 }}
+          >
+            Cancel Upload
+          </Button>
+        </Paper>
+      </Backdrop>
     </Box>
   );
 };
