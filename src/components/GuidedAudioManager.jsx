@@ -997,7 +997,7 @@ const GuidedAudioManager = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, position: 'relative' }}>
         {selectedCategory ? (
           <Breadcrumbs sx={{ mb: 2 }}>
             <Link
@@ -1014,45 +1014,43 @@ const GuidedAudioManager = () => {
               {selectedCategory.name}
             </Typography>
           </Breadcrumbs>
-        ) : null}
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="600">
-              {selectedCategory ? `${selectedCategory.name} Audio Files` : 'Audio Categories'}
+        ) : (
+          <Breadcrumbs sx={{ mb: 2 }}>
+            <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
+              Audio Categories
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {selectedCategory
-                ? 'Manage audio files within this category'
-                : 'Manage audio categories and files for guided affirmations'
-              }
-            </Typography>
-          </Box>
+          </Breadcrumbs>
+        )}
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<CategoryIcon />}
-              onClick={() => handleCategoryOpen()}
-            >
-              Add Category
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<AudioIcon />}
-              onClick={() => handleAudioOpen()}
-            >
-              Add Audio
-            </Button>
-          </Box>
+        <Box sx={{ 
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          display: 'flex',
+          gap: 2
+        }}>
+          <Button
+            variant="outlined"
+            startIcon={<CategoryIcon />}
+            onClick={() => handleCategoryOpen()}
+          >
+            Add Category
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<AudioIcon />}
+            onClick={() => handleAudioOpen()}
+          >
+            Add Audio
+          </Button>
         </Box>
       </Box>
 
       {/* Audio Categories Section */}
       <Box sx={{ mb: 6 }}>
-        <Typography variant="h5" gutterBottom fontWeight="600" sx={{ mb: 3 }}>
+        {/* <Typography variant="h5" gutterBottom fontWeight="600" sx={{ mb: 3 }}>
           Audio Categories
-        </Typography>
+        </Typography> */}
         
         {/* Published Categories */}
         {audioCategories.filter(cat => cat.isPublished).length > 0 && (
@@ -1062,74 +1060,143 @@ const GuidedAudioManager = () => {
                 Published
               </Typography>
             </Box>
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
               {audioCategories
                 .filter(category => category.isPublished)
                 .map((category) => (
-                  <Grid item xs={12} sm={6} md={4} key={category.id}>
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
                     <Card
                       sx={{
                         height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
+                        background: selectedCategory?.id === category.id 
+                          ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(14, 165, 233, 0.4) 50%, rgba(139, 92, 246, 0.4) 100%)'
+                          : 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(14, 165, 233, 0.1) 50%, rgba(139, 92, 246, 0.1) 100%)',
                         border: selectedCategory?.id === category.id ? '2px solid' : '1px solid',
-                        borderColor: selectedCategory?.id === category.id ? theme.palette.primary.main : theme.palette.divider,
+                        borderColor: selectedCategory?.id === category.id 
+                          ? 'primary.main' 
+                          : 'divider',
+                        borderRadius: 2,
                         '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(34, 197, 94, 0.2)',
+                          background: selectedCategory?.id === category.id 
+                            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.5) 0%, rgba(14, 165, 233, 0.5) 50%, rgba(139, 92, 246, 0.5) 100%)'
+                            : 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(14, 165, 233, 0.15) 50%, rgba(139, 92, 246, 0.15) 100%)',
                         }
                       }}
                       onClick={() => handleCategorySelect(category)}
                     >
-                      <CardContent sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-                          <MusicIcon
-                            sx={{
-                              fontSize: 40,
-                              color: category.isPublished ? theme.palette.primary.main : theme.palette.text.disabled,
-                              mb: 1
-                            }}
-                          />
-                          <IconButton
-                            onClick={(e) => handleCategoryMenuOpen(e, category)}
-                            size="small"
-                          >
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-
-                        <Typography variant="h6" gutterBottom fontWeight="600">
+                      <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight="600" 
+                          sx={{ 
+                            mb: 0.5,
+                            color: 'text.primary'
+                          }}
+                        >
                           {category.name}
                         </Typography>
 
                         {category.description && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              mb: 1.5,
+                              color: 'text.secondary',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              flexGrow: 1
+                            }}
+                          >
                             {category.description}
                           </Typography>
                         )}
 
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                          <Chip
-                            label={category.isPublished ? 'Published' : 'Unpublished'}
-                            color={category.isPublished ? 'primary' : 'default'}
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCategoryTogglePublished(category);
-                            }}
-                            sx={{ cursor: 'pointer' }}
-                          />
-                          <Chip
-                            label="Premium"
-                            color={category.isPremium ? 'secondary' : 'default'}
-                            size="small"
-                            variant={category.isPremium ? 'filled' : 'outlined'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCategoryTogglePremium(category);
-                            }}
-                            sx={{ cursor: 'pointer' }}
-                          />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', mt: 'auto' }}>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Chip
+                              label={category.isPublished ? 'Published' : 'Unpublished'}
+                              color={category.isPublished ? 'primary' : 'default'}
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryTogglePublished(category);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer', 
+                                height: 24,
+                                fontSize: '0.7rem',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                            <Chip
+                              label="Premium"
+                              color={category.isPremium ? 'secondary' : 'default'}
+                              size="small"
+                              variant={category.isPremium ? 'filled' : 'outlined'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryTogglePremium(category);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer', 
+                                height: 24,
+                                fontSize: '0.7rem',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryOpen(category);
+                              }}
+                              sx={{ 
+                                p: 0.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: 'action.hover' }
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCategoryItem(category);
+                                if (window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) {
+                                  const categoryToDelete = category;
+                                  setAudioCategories(prev => prev.filter(cat => cat.id !== categoryToDelete.id));
+                                  if (selectedCategory?.id === categoryToDelete.id) {
+                                    setSelectedCategory(null);
+                                    setAudioItems([]);
+                                  }
+                                  deleteAudioCategory(categoryToDelete.id).catch(error => {
+                                    console.error('Error deleting category:', error);
+                                    setAudioCategories(prev => [...prev, categoryToDelete].sort((a, b) => a.name.localeCompare(b.name)));
+                                    alert('Error deleting category. Please try again.');
+                                  });
+                                }
+                              }}
+                              sx={{ 
+                                p: 0.5,
+                                color: 'error.main',
+                                '&:hover': { bgcolor: 'error.light' }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -1147,74 +1214,143 @@ const GuidedAudioManager = () => {
                 Unpublished
               </Typography>
             </Box>
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
               {audioCategories
                 .filter(category => !category.isPublished)
                 .map((category) => (
-                  <Grid item xs={12} sm={6} md={4} key={category.id}>
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={category.id}>
                     <Card
                       sx={{
                         height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
+                        background: selectedCategory?.id === category.id 
+                          ? 'linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(71, 85, 105, 0.3) 100%)'
+                          : 'linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(71, 85, 105, 0.1) 100%)',
                         border: selectedCategory?.id === category.id ? '2px solid' : '1px solid',
-                        borderColor: selectedCategory?.id === category.id ? theme.palette.primary.main : theme.palette.divider,
+                        borderColor: selectedCategory?.id === category.id 
+                          ? 'grey.600' 
+                          : 'divider',
+                        borderRadius: 2,
                         '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(100, 116, 139, 0.2)',
+                          background: selectedCategory?.id === category.id 
+                            ? 'linear-gradient(135deg, rgba(100, 116, 139, 0.4) 0%, rgba(71, 85, 105, 0.4) 100%)'
+                            : 'linear-gradient(135deg, rgba(100, 116, 139, 0.15) 0%, rgba(71, 85, 105, 0.15) 100%)',
                         }
                       }}
                       onClick={() => handleCategorySelect(category)}
                     >
-                      <CardContent sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-                          <MusicIcon
-                            sx={{
-                              fontSize: 40,
-                              color: category.isPublished ? theme.palette.primary.main : theme.palette.text.disabled,
-                              mb: 1
-                            }}
-                          />
-                          <IconButton
-                            onClick={(e) => handleCategoryMenuOpen(e, category)}
-                            size="small"
-                          >
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-
-                        <Typography variant="h6" gutterBottom fontWeight="600">
+                      <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight="600" 
+                          sx={{ 
+                            mb: 0.5,
+                            color: 'text.primary'
+                          }}
+                        >
                           {category.name}
                         </Typography>
 
                         {category.description && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              mb: 1.5,
+                              color: 'text.secondary',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              flexGrow: 1
+                            }}
+                          >
                             {category.description}
                           </Typography>
                         )}
 
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                          <Chip
-                            label={category.isPublished ? 'Published' : 'Unpublished'}
-                            color={category.isPublished ? 'primary' : 'default'}
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCategoryTogglePublished(category);
-                            }}
-                            sx={{ cursor: 'pointer' }}
-                          />
-                          <Chip
-                            label="Premium"
-                            color={category.isPremium ? 'secondary' : 'default'}
-                            size="small"
-                            variant={category.isPremium ? 'filled' : 'outlined'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCategoryTogglePremium(category);
-                            }}
-                            sx={{ cursor: 'pointer' }}
-                          />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', mt: 'auto' }}>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Chip
+                              label={category.isPublished ? 'Published' : 'Unpublished'}
+                              color={category.isPublished ? 'primary' : 'default'}
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryTogglePublished(category);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer', 
+                                height: 24,
+                                fontSize: '0.7rem',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                            <Chip
+                              label="Premium"
+                              color={category.isPremium ? 'secondary' : 'default'}
+                              size="small"
+                              variant={category.isPremium ? 'filled' : 'outlined'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryTogglePremium(category);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer', 
+                                height: 24,
+                                fontSize: '0.7rem',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategoryOpen(category);
+                              }}
+                              sx={{ 
+                                p: 0.5,
+                                color: 'text.secondary',
+                                '&:hover': { bgcolor: 'action.hover' }
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCategoryItem(category);
+                                if (window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) {
+                                  const categoryToDelete = category;
+                                  setAudioCategories(prev => prev.filter(cat => cat.id !== categoryToDelete.id));
+                                  if (selectedCategory?.id === categoryToDelete.id) {
+                                    setSelectedCategory(null);
+                                    setAudioItems([]);
+                                  }
+                                  deleteAudioCategory(categoryToDelete.id).catch(error => {
+                                    console.error('Error deleting category:', error);
+                                    setAudioCategories(prev => [...prev, categoryToDelete].sort((a, b) => a.name.localeCompare(b.name)));
+                                    alert('Error deleting category. Please try again.');
+                                  });
+                                }
+                              }}
+                              sx={{ 
+                                p: 0.5,
+                                color: 'error.main',
+                                '&:hover': { bgcolor: 'error.light' }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -1228,255 +1364,332 @@ const GuidedAudioManager = () => {
       {/* Audio Files Section */}
       {selectedCategory && (
         <Box>
-          <Typography variant="h5" gutterBottom fontWeight="600" sx={{ mb: 3 }}>
-            Audio Files for "{selectedCategory.name}"
-          </Typography>
-          <Grid container spacing={3}>
-            {audioItems.map((item) => (
-              <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <Card
+          <Box sx={{ position: 'relative', mb: 3 }}>
+            <Typography variant="h5" fontWeight="600">
+              Audio Files for "{selectedCategory.name}"
+            </Typography>
+            {audioItems.length === 0 && (
+              <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleAudioOpen()}
                   sx={{
-                    height: '100%',
-                    transition: 'all 0.3s ease',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)',
                     '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
+                      background: 'linear-gradient(135deg, #16a34a 0%, #0284c7 50%, #7c3aed 100%)',
                     }
                   }}
                 >
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-                      <AudioIcon
-                        sx={{
-                          fontSize: 40,
-                          color: item.isPublished ? theme.palette.primary.main : theme.palette.text.disabled,
-                          mb: 1
-                        }}
-                      />
-                      <IconButton
-                        onClick={(e) => handleAudioMenuOpen(e, item)}
-                        size="small"
-                      >
-                        <MoreIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-
-                    <Typography variant="h6" gutterBottom fontWeight="600">
-                      {item.title}
-                    </Typography>
-
-                    {item.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {item.description}
-                      </Typography>
-                    )}
-
-                    {/* Audio files display with players */}
-                    {item.audio && item.audio.length > 0 && (
-                      <Box sx={{ mb: 2 }}>
-                        {item.audio.map((audio, index) => {
-                          const normalizedGender = normalizeGender(audio.gender);
-                          const audioKey = getCardAudioKey(item.id, index);
-                          const audioState = cardAudioStates[audioKey] || { playing: false, currentTime: 0, duration: 0, muted: false };
-                          
-                          return (
-                            <Box key={index} sx={{ mb: 1.5 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                                {normalizedGender === 'male' ? <MaleIcon fontSize="small" /> : <FemaleIcon fontSize="small" />}
-                                <Typography variant="caption" color="text.secondary">
-                                  {normalizedGender.charAt(0).toUpperCase() + normalizedGender.slice(1)} Voice
-                                </Typography>
-                              </Box>
-                              
-                              <audio
-                                ref={(el) => {
-                                  if (el) cardAudioRefs.current[audioKey] = el;
-                                }}
-                                src={audio.audioUrl}
-                                onPlay={() => {
-                                  setCardAudioStates(prev => ({
-                                    ...prev,
-                                    [audioKey]: { ...prev[audioKey], playing: true }
-                                  }));
-                                }}
-                                onPause={() => {
-                                  setCardAudioStates(prev => ({
-                                    ...prev,
-                                    [audioKey]: { ...prev[audioKey], playing: false }
-                                  }));
-                                }}
-                                onEnded={() => {
-                                  setCardAudioStates(prev => ({
-                                    ...prev,
-                                    [audioKey]: { ...prev[audioKey], playing: false, currentTime: 0 }
-                                  }));
-                                }}
-                                onTimeUpdate={() => handleCardAudioTimeUpdate(item.id, index)}
-                                onLoadedMetadata={() => handleCardAudioLoadedMetadata(item.id, index)}
-                                muted={audioState.muted}
-                                style={{ display: 'none' }}
-                              />
-                              
-                              <Box
-                                sx={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 1.5,
-                                  p: 1.5,
-                                  bgcolor: 'grey.200',
-                                  borderRadius: '50px',
-                                  border: 'none',
-                                  boxShadow: 'none'
-                                }}
-                              >
-                                {/* Play/Pause Button */}
-                                <IconButton
-                                  onClick={() => handleCardAudioPlay(item.id, index, audio.audioUrl)}
-                                  size="small"
-                                  sx={{
-                                    bgcolor: 'transparent',
-                                    color: '#000',
-                                    width: 36,
-                                    height: 36,
-                                    p: 0,
-                                    '&:hover': {
-                                      bgcolor: 'rgba(0, 0, 0, 0.05)'
-                                    },
-                                    '& svg': {
-                                      fontSize: '1.2rem'
-                                    }
-                                  }}
-                                >
-                                  {audioState.playing ? <PauseIcon /> : <PlayIcon />}
-                                </IconButton>
-
-                                {/* Time Display */}
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    minWidth: 90,
-                                    fontFamily: 'monospace',
-                                    color: '#000',
-                                    fontSize: '0.875rem',
-                                    whiteSpace: 'nowrap',
-                                    display: 'inline-block',
-                                    lineHeight: 1.5,
-                                    flexShrink: 0,
-                                    fontWeight: 400,
-                                    visibility: audioState.duration > 0 ? 'visible' : 'visible'
-                                  }}
-                                >
-                                  {formatTime(audioState.currentTime || 0)} / {formatTime(audioState.duration || 0)}
-                                </Box>
-
-                                {/* Progress Bar */}
-                                <Slider
-                                  value={audioState.duration > 0 ? (audioState.currentTime / audioState.duration) * 100 : 0}
-                                  onChange={(e, newValue) => handleCardAudioProgressChange(item.id, index, newValue)}
-                                  sx={{
-                                    flexGrow: 1,
-                                    color: 'grey.700',
-                                    height: 4,
-                                    cursor: 'pointer',
-                                    '& .MuiSlider-thumb': {
-                                      width: 0,
-                                      height: 0,
-                                      '&:hover': {
-                                        width: 12,
-                                        height: 12,
-                                        boxShadow: '0 0 0 8px rgba(0, 0, 0, 0.04)'
-                                      }
-                                    },
-                                    '& .MuiSlider-track': {
-                                      height: 4,
-                                      borderRadius: 2,
-                                      bgcolor: 'grey.700',
-                                      border: 'none'
-                                    },
-                                    '& .MuiSlider-rail': {
-                                      height: 4,
-                                      borderRadius: 2,
-                                      bgcolor: 'grey.300',
-                                      opacity: 1
-                                    },
-                                    '&:hover .MuiSlider-thumb': {
-                                      width: 12,
-                                      height: 12
-                                    }
-                                  }}
-                                />
-
-                                {/* Mute Button */}
-                                <IconButton
-                                  onClick={() => handleCardAudioMuteToggle(item.id, index)}
-                                  size="small"
-                                  sx={{
-                                    color: '#000',
-                                    width: 32,
-                                    height: 32,
-                                    '&:hover': {
-                                      bgcolor: 'rgba(0, 0, 0, 0.05)'
-                                    },
-                                    '& svg': {
-                                      fontSize: '1.1rem'
-                                    }
-                                  }}
-                                >
-                                  {audioState.muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
-                                </IconButton>
-
-                                {/* More Options */}
-                                <IconButton
-                                  size="small"
-                                  sx={{
-                                    color: '#000',
-                                    width: 32,
-                                    height: 32,
-                                    '&:hover': {
-                                      bgcolor: 'rgba(0, 0, 0, 0.05)'
-                                    },
-                                    '& svg': {
-                                      fontSize: '1.1rem'
-                                    }
-                                  }}
-                                >
-                                  <MoreIcon />
-                                </IconButton>
-                              </Box>
-                            </Box>
-                          );
-                        })}
+                  Add Audio
+                </Button>
+              </Box>
+            )}
+          </Box>
+          {audioItems.length === 0 ? (
+            <Box sx={{ 
+              textAlign: 'center', 
+              py: 8, 
+              px: 3,
+              borderRadius: 2,
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.05)' 
+                : 'grey.50',
+              border: '2px dashed',
+              borderColor: 'divider',
+              transition: 'background-color 0.3s ease'
+            }}>
+              <AudioIcon sx={{ 
+                fontSize: 64, 
+                color: 'text.disabled', 
+                mb: 2,
+                opacity: 0.5
+              }} />
+              <Typography 
+                variant="h6" 
+                color="text.primary" 
+                gutterBottom
+                sx={{ fontWeight: 500 }}
+              >
+                No audio files yet
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary" 
+                sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}
+              >
+                Get started by adding your first audio file to this category
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleAudioOpen()}
+                sx={{
+                  background: 'linear-gradient(135deg, #22c55e 0%, #0ea5e9 50%, #8b5cf6 100%)',
+                  color: 'white',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #16a34a 0%, #0284c7 50%, #7c3aed 100%)',
+                  }
+                }}
+              >
+                Add Audio
+              </Button>
+            </Box>
+          ) : (
+            <Grid container spacing={2}>
+              {audioItems.map((item) => (
+                <Grid item xs={12} sm={6} md={4} key={item.id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      }
+                    }}
+                  >
+                    <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="600" sx={{ flexGrow: 1 }}>
+                          {item.title}
+                        </Typography>
+                        <IconButton
+                          onClick={(e) => handleAudioMenuOpen(e, item)}
+                          size="small"
+                          sx={{ 
+                            p: 0.5,
+                            ml: 1,
+                            color: 'text.secondary',
+                            '&:hover': { bgcolor: 'action.hover' }
+                          }}
+                        >
+                          <MoreIcon fontSize="small" />
+                        </IconButton>
                       </Box>
-                    )}
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                      <Chip
-                        label={item.isPublished ? 'Published' : 'Unpublished'}
-                        color={item.isPublished ? 'primary' : 'default'}
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAudioTogglePublished(item);
-                        }}
-                        sx={{ cursor: 'pointer' }}
-                      />
-                      <Chip
-                        label="Premium"
-                        color={item.isPremium ? 'secondary' : 'default'}
-                        size="small"
-                        variant={item.isPremium ? 'filled' : 'outlined'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAudioTogglePremium(item);
-                        }}
-                        sx={{ cursor: 'pointer' }}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                      {item.description && (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            mb: 1.5,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}
+                        >
+                          {item.description}
+                        </Typography>
+                      )}
+
+                      {/* Audio files display with players */}
+                      {item.audio && item.audio.length > 0 && (
+                        <Box sx={{ mb: 1.5 }}>
+                          {item.audio.map((audio, index) => {
+                            const normalizedGender = normalizeGender(audio.gender);
+                            const audioKey = getCardAudioKey(item.id, index);
+                            const audioState = cardAudioStates[audioKey] || { playing: false, currentTime: 0, duration: 0, muted: false };
+                            
+                            return (
+                              <Box key={index} sx={{ mb: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                  {normalizedGender === 'male' ? (
+                                    <MaleIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+                                  ) : (
+                                    <FemaleIcon sx={{ fontSize: 14, color: 'secondary.main' }} />
+                                  )}
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                    {normalizedGender.charAt(0).toUpperCase() + normalizedGender.slice(1)}
+                                  </Typography>
+                                </Box>
+                                
+                                <audio
+                                  ref={(el) => {
+                                    if (el) cardAudioRefs.current[audioKey] = el;
+                                  }}
+                                  src={audio.audioUrl}
+                                  onPlay={() => {
+                                    setCardAudioStates(prev => ({
+                                      ...prev,
+                                      [audioKey]: { ...prev[audioKey], playing: true }
+                                    }));
+                                  }}
+                                  onPause={() => {
+                                    setCardAudioStates(prev => ({
+                                      ...prev,
+                                      [audioKey]: { ...prev[audioKey], playing: false }
+                                    }));
+                                  }}
+                                  onEnded={() => {
+                                    setCardAudioStates(prev => ({
+                                      ...prev,
+                                      [audioKey]: { ...prev[audioKey], playing: false, currentTime: 0 }
+                                    }));
+                                  }}
+                                  onTimeUpdate={() => handleCardAudioTimeUpdate(item.id, index)}
+                                  onLoadedMetadata={() => handleCardAudioLoadedMetadata(item.id, index)}
+                                  muted={audioState.muted}
+                                  style={{ display: 'none' }}
+                                />
+                                
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.75,
+                                    p: 0.75,
+                                    bgcolor: 'grey.50',
+                                    borderRadius: 1,
+                                    border: '1px solid',
+                                    borderColor: 'divider'
+                                  }}
+                                >
+                                  {/* Play/Pause Button */}
+                                  <IconButton
+                                    onClick={() => handleCardAudioPlay(item.id, index, audio.audioUrl)}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: 'white',
+                                      color: 'primary.main',
+                                      width: 28,
+                                      height: 28,
+                                      p: 0,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                      '&:hover': {
+                                        bgcolor: 'grey.100',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                                      },
+                                      '& svg': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  >
+                                    {audioState.playing ? <PauseIcon /> : <PlayIcon />}
+                                  </IconButton>
+
+                                  {/* Time Display */}
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      minWidth: 70,
+                                      fontFamily: 'monospace',
+                                      color: 'text.secondary',
+                                      fontSize: '0.7rem',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    {formatTime(audioState.currentTime || 0)} / {formatTime(audioState.duration || 0)}
+                                  </Box>
+
+                                  {/* Progress Bar */}
+                                  <Slider
+                                    value={audioState.duration > 0 ? (audioState.currentTime / audioState.duration) * 100 : 0}
+                                    onChange={(e, newValue) => handleCardAudioProgressChange(item.id, index, newValue)}
+                                    size="small"
+                                    sx={{
+                                      flexGrow: 1,
+                                      color: 'primary.main',
+                                      height: 3,
+                                      cursor: 'pointer',
+                                      '& .MuiSlider-thumb': {
+                                        width: 0,
+                                        height: 0,
+                                        '&:hover': {
+                                          width: 10,
+                                          height: 10
+                                        }
+                                      },
+                                      '& .MuiSlider-track': {
+                                        height: 3,
+                                        borderRadius: 1.5
+                                      },
+                                      '& .MuiSlider-rail': {
+                                        height: 3,
+                                        borderRadius: 1.5,
+                                        bgcolor: 'grey.300',
+                                        opacity: 1
+                                      },
+                                      '&:hover .MuiSlider-thumb': {
+                                        width: 10,
+                                        height: 10
+                                      }
+                                    }}
+                                  />
+
+                                  {/* Mute Button */}
+                                  <IconButton
+                                    onClick={() => handleCardAudioMuteToggle(item.id, index)}
+                                    size="small"
+                                    sx={{
+                                      color: 'text.secondary',
+                                      width: 24,
+                                      height: 24,
+                                      p: 0,
+                                      '&:hover': {
+                                        bgcolor: 'action.hover',
+                                        color: 'text.primary'
+                                      },
+                                      '& svg': {
+                                        fontSize: '0.875rem'
+                                      }
+                                    }}
+                                  >
+                                    {audioState.muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+                                  </IconButton>
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+
+                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 'auto', pt: 1 }}>
+                        <Chip
+                          label={item.isPublished ? 'Published' : 'Unpublished'}
+                          color={item.isPublished ? 'primary' : 'default'}
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAudioTogglePublished(item);
+                          }}
+                          sx={{ 
+                            cursor: 'pointer',
+                            height: 22,
+                            fontSize: '0.7rem',
+                            '& .MuiChip-label': { px: 1 }
+                          }}
+                        />
+                        <Chip
+                          label="Premium"
+                          color={item.isPremium ? 'secondary' : 'default'}
+                          size="small"
+                          variant={item.isPremium ? 'filled' : 'outlined'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAudioTogglePremium(item);
+                          }}
+                          sx={{ 
+                            cursor: 'pointer',
+                            height: 22,
+                            fontSize: '0.7rem',
+                            '& .MuiChip-label': { px: 1 }
+                          }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
         </Box>
       )}
 
@@ -1506,31 +1719,6 @@ const GuidedAudioManager = () => {
         </MenuItem>
       </Menu>
 
-      {/* Category Menu */}
-      <Menu
-        anchorEl={categoryMenuAnchor}
-        open={Boolean(categoryMenuAnchor)}
-        onClose={handleCategoryMenuClose}
-      >
-        <MenuItem onClick={() => {
-          handleCategoryOpen(selectedCategoryItem);
-          handleCategoryMenuClose();
-        }}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          Edit
-        </MenuItem>
-        <MenuItem
-          onClick={handleCategoryDelete}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          Delete
-        </MenuItem>
-      </Menu>
 
       {/* Category Dialog */}
       <Dialog open={categoryOpen} onClose={handleCategoryClose} maxWidth="sm" fullWidth>
@@ -1662,192 +1850,6 @@ const GuidedAudioManager = () => {
                 ))}
               </Select>
             </FormControl>
-
-            {/* Audio URL Input - Only show when adding new audio */}
-            {!editingItem && (
-              <TextField
-                margin="dense"
-                name="audioUrl"
-                label="Audio URL (Optional)"
-                type="url"
-                fullWidth
-                variant="outlined"
-                value={formData.audioUrl}
-                onChange={handleAudioChange}
-                placeholder="https://example.com/audio.mp3"
-                helperText="Enter a direct audio URL or upload files below"
-                sx={{ mb: 2 }}
-              />
-            )}
-
-            {/* Audio Playback Controls for URL - Only when adding */}
-            {!editingItem && formData.audioUrl && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Audio Preview
-                </Typography>
-                <audio
-                  ref={audioRef}
-                  src={formData.audioUrl}
-                  onPlay={() => setAudioPlaying(true)}
-                  onPause={() => setAudioPlaying(false)}
-                  onEnded={() => {
-                    setAudioPlaying(false);
-                    setAudioCurrentTime(0);
-                  }}
-                  onTimeUpdate={handleAudioTimeUpdate}
-                  onLoadedMetadata={handleAudioLoadedMetadata}
-                  muted={audioMuted}
-                  style={{ display: 'none' }}
-                />
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    p: 1.5,
-                    bgcolor: 'grey.200',
-                    borderRadius: '50px',
-                    border: 'none',
-                    boxShadow: 'none',
-                    flexWrap: 'nowrap'
-                  }}
-                >
-                  {/* Play/Pause Button */}
-                  <IconButton
-                    onClick={() => {
-                      if (audioPlaying) {
-                        audioRef.current?.pause();
-                      } else {
-                        audioRef.current?.play();
-                      }
-                    }}
-                    sx={{
-                      bgcolor: 'transparent',
-                      color: '#000',
-                      width: 40,
-                      height: 40,
-                      p: 0,
-                      '&:hover': {
-                        bgcolor: 'rgba(0, 0, 0, 0.05)'
-                      },
-                      '& svg': {
-                        fontSize: '1.3rem'
-                      }
-                    }}
-                  >
-                    {audioPlaying ? <PauseIcon /> : <PlayIcon />}
-                  </IconButton>
-
-                  {/* Time Display */}
-                  <Box
-                    component="span"
-                    sx={{
-                      minWidth: 90,
-                      fontFamily: 'monospace',
-                      color: '#000',
-                      fontSize: '0.875rem',
-                      whiteSpace: 'nowrap',
-                      display: 'inline-block',
-                      lineHeight: 1.5,
-                      flexShrink: 0,
-                      fontWeight: 400,
-                      visibility: 'visible'
-                    }}
-                  >
-                    {formatTime(audioCurrentTime || 0)} / {formatTime(audioDuration || 0)}
-                  </Box>
-
-                  {/* Progress Bar */}
-                  <Slider
-                    value={audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0}
-                    onChange={handleProgressChange}
-                    onChangeCommitted={handleProgressChange}
-                    sx={{
-                      flexGrow: 1,
-                      color: 'grey.700',
-                      height: 4,
-                      cursor: 'pointer',
-                      '& .MuiSlider-thumb': {
-                        width: 0,
-                        height: 0,
-                        '&:hover': {
-                          width: 12,
-                          height: 12,
-                          boxShadow: '0 0 0 8px rgba(0, 0, 0, 0.04)'
-                        }
-                      },
-                      '& .MuiSlider-track': {
-                        height: 4,
-                        borderRadius: 2,
-                        bgcolor: 'grey.700',
-                        border: 'none'
-                      },
-                      '& .MuiSlider-rail': {
-                        height: 4,
-                        borderRadius: 2,
-                        bgcolor: 'grey.300',
-                        opacity: 1
-                      },
-                      '&:hover .MuiSlider-thumb': {
-                        width: 12,
-                        height: 12
-                      }
-                    }}
-                  />
-
-                  {/* Mute Button */}
-                  <IconButton
-                    onClick={handleMuteToggle}
-                    size="small"
-                    sx={{
-                      color: '#000',
-                      width: 32,
-                      height: 32,
-                      '&:hover': {
-                        bgcolor: 'rgba(0, 0, 0, 0.05)'
-                      },
-                      '& svg': {
-                        fontSize: '1.1rem'
-                      }
-                    }}
-                  >
-                    {audioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
-                  </IconButton>
-
-                  {/* More Options Menu */}
-                  <IconButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // For now, show delete option directly
-                      if (window.confirm('Delete this audio URL?')) {
-                        if (audioPlaying) {
-                          audioRef.current?.pause();
-                          setAudioPlaying(false);
-                        }
-                        setFormData(prev => ({ ...prev, audioUrl: '' }));
-                        setAudioCurrentTime(0);
-                        setAudioDuration(0);
-                      }
-                    }}
-                    size="small"
-                    sx={{
-                      color: '#000',
-                      width: 32,
-                      height: 32,
-                      '&:hover': {
-                        bgcolor: 'rgba(0, 0, 0, 0.05)'
-                      },
-                      '& svg': {
-                        fontSize: '1.1rem'
-                      }
-                    }}
-                  >
-                    <MoreIcon />
-                  </IconButton>
-                </Box>
-              </Box>
-            )}
 
             {/* Audio Files Upload */}
             <Box sx={{ mb: 2 }}>
