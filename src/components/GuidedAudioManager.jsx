@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { uploadFilesToStorage } from '../services/firebaseStorageService';
 import {
   Box,
   Button,
@@ -546,54 +547,8 @@ const GuidedAudioManager = () => {
     // Calculate total file size for progress tracking
     const activePreviews = localFilePreviews.filter(p => p.status === 'active');
     const totalSize = activePreviews.reduce((sum, preview) => sum + (preview.file?.size || 0), 0);
+    const filesToUpload = activePreviews.map(p => p.file);
     
-    if (totalSize === 0 && activePreviews.length === 0) {
-      // No files to upload, proceed without progress tracking
-      setUploading(true);
-      try {
-        const submitData = new FormData();
-        submitData.append('title', formData.title);
-        submitData.append('description', formData.description);
-        submitData.append('categoryId', formData.categoryId);
-        submitData.append('categoryName', formData.categoryName);
-        submitData.append('audioUrl', formData.audioUrl);
-        submitData.append('isPublished', formData.isPublished);
-        submitData.append('isPremium', formData.isPremium);
-
-        const existingAudio = formData.audio || [];
-        const genders = formData.genders || [];
-
-        existingAudio.forEach((audioItem, index) => {
-          if (deletedExistingAudio.includes(index)) return;
-          const updatedGender = genders[index] || audioItem.gender || 'male';
-          submitData.append('existingAudio', JSON.stringify({
-            ...audioItem,
-            gender: updatedGender === 'male' ? 'm' : 'f'
-          }));
-        });
-        
-        if (deletedExistingAudio.length > 0) {
-          submitData.append('deletedAudioIndices', JSON.stringify(deletedExistingAudio));
-        }
-
-        if (editingItem) {
-          await updateGuidedAudio(editingItem.id, submitData);
-        } else {
-          await createGuidedAudio(submitData);
-        }
-
-        handleAudioClose();
-      } catch (error) {
-        if (error.name !== 'CanceledError') {
-          console.error('Error saving audio item:', error);
-          alert('Error saving audio item. Please try again.');
-        }
-      } finally {
-        setUploading(false);
-      }
-      return;
-    }
-
     // Initialize upload progress tracking
     setTotalFileSize(totalSize);
     setUploadedBytes(0);
@@ -603,115 +558,225 @@ const GuidedAudioManager = () => {
     setUploadStartTime(Date.now());
     setUploading(true);
 
-    // Create AbortController for cancel functionality
-    const abortController = new AbortController();
-    setUploadCancelController(abortController);
-
-    // Track upload progress
-    let lastLoaded = 0;
+    // Track upload progress for Firebase Storage
+    const fileProgress = {}; // Track progress for each file
     let lastTime = Date.now();
+    let lastTotalUploaded = 0;
 
-    const onUploadProgress = (progressEvent) => {
-      // Handle both lengthComputable and non-lengthComputable cases
-      if (progressEvent.lengthComputable && progressEvent.total > 0) {
-        const loaded = progressEvent.loaded;
-        const total = progressEvent.total;
-        
-        // Cap progress at 90% until we get the response (remaining 10% is for server processing/Firebase upload)
-        const rawPercent = (loaded / total) * 100;
-        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
-        
-        setUploadedBytes(loaded);
-        setUploadProgress(percentCompleted);
+    const onFirebaseProgress = (fileIndex, bytesTransferred, totalBytes, progress) => {
+      // Track progress for this specific file
+      fileProgress[fileIndex] = { bytesTransferred, totalBytes, progress };
+      
+      // Calculate total progress across all files
+      let totalUploadedBytes = 0;
+      let totalBytesAll = 0;
+      Object.values(fileProgress).forEach(fileProg => {
+        totalUploadedBytes += fileProg.bytesTransferred;
+        totalBytesAll += fileProg.totalBytes;
+      });
+      
+      // If no files, use totalSize as fallback
+      const effectiveTotal = totalBytesAll > 0 ? totalBytesAll : totalSize;
+      const overallProgress = effectiveTotal > 0 
+        ? (totalUploadedBytes / effectiveTotal) * 100 
+        : 0;
+      
+      setUploadedBytes(totalUploadedBytes);
+      setUploadProgress(Math.min(Math.round(overallProgress * 0.95), 95)); // Cap at 95% for file upload, 5% for API call
 
-        // Calculate upload speed
-        const currentTime = Date.now();
-        const timeDiff = (currentTime - lastTime) / 1000; // seconds
-        const bytesDiff = loaded - lastLoaded;
+      // Calculate upload speed
+      const currentTime = Date.now();
+      const timeDiff = (currentTime - lastTime) / 1000; // seconds
+      const bytesDiff = totalUploadedBytes - lastTotalUploaded;
+      
+      if (timeDiff > 0 && bytesDiff > 0) {
+        const speed = bytesDiff / timeDiff; // bytes per second
+        setUploadSpeed(speed);
         
-        if (timeDiff > 0 && bytesDiff > 0) {
-          const speed = bytesDiff / timeDiff; // bytes per second
-          setUploadSpeed(speed);
-          
-          // Calculate time remaining (accounting for 90% cap)
-          const remaining = total - loaded;
-          if (speed > 0) {
-            const remainingSeconds = (remaining / speed) * 1.1; // Add 10% buffer for server processing
-            setTimeRemaining(remainingSeconds);
-          }
+        // Calculate time remaining
+        const remaining = effectiveTotal - totalUploadedBytes;
+        if (speed > 0 && remaining > 0) {
+          const remainingSeconds = remaining / speed;
+          setTimeRemaining(remainingSeconds);
         }
-        
-        lastLoaded = loaded;
-        lastTime = currentTime;
-      } else if (progressEvent.loaded > 0) {
-        // Fallback: estimate progress based on loaded bytes if total is unknown
-        const loaded = progressEvent.loaded;
-        const estimatedTotal = totalSize || loaded * 2; // Rough estimate
-        const rawPercent = (loaded / estimatedTotal) * 100;
-        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
-        
-        setUploadedBytes(loaded);
-        setUploadProgress(percentCompleted);
       }
+      
+      lastTotalUploaded = totalUploadedBytes;
+      lastTime = currentTime;
     };
 
     try {
-      const submitData = new FormData();
-      submitData.append('title', formData.title);
-      submitData.append('description', formData.description);
-      submitData.append('categoryId', formData.categoryId);
-      submitData.append('categoryName', formData.categoryName);
-      submitData.append('audioUrl', formData.audioUrl);
-      submitData.append('isPublished', formData.isPublished);
-      submitData.append('isPremium', formData.isPremium);
+      let uploadedFileUrls = [];
 
-      // Handle existing audio files and their updated genders (exclude deleted ones)
-      const existingAudio = formData.audio || [];
-      const genders = formData.genders || [];
-
-      // Send existing audio data with updated genders (only non-deleted ones)
-      existingAudio.forEach((audioItem, index) => {
-        // Skip deleted audio files
-        if (deletedExistingAudio.includes(index)) {
+      // Step 1: Upload files directly to Firebase Storage (if any)
+      if (filesToUpload.length > 0) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('🚀 STEP 1: Starting direct Firebase Storage upload (GuidedAudioManager)');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📊 Upload Summary:', {
+          fileCount: filesToUpload.length,
+          totalSize: `${(totalSize / 1024 / 1024).toFixed(2)} MB`,
+          contentType: 'audio',
+          files: filesToUpload.map(f => ({
+            name: f.name,
+            size: `${(f.size / 1024 / 1024).toFixed(2)} MB`,
+            type: f.type
+          }))
+        });
+        
+        try {
+          uploadedFileUrls = await uploadFilesToStorage(
+            filesToUpload,
+            'audio',
+            onFirebaseProgress
+          );
+          
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('✅ STEP 1 COMPLETE: Files uploaded to Firebase Storage');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('🔗 Received URLs:', uploadedFileUrls);
+          
+          // Validate that we got URLs back
+          if (!uploadedFileUrls || uploadedFileUrls.length === 0) {
+            throw new Error('No download URLs received from Firebase Storage');
+          }
+          
+          // Check if any URL is missing
+          const missingUrls = uploadedFileUrls.filter(url => !url);
+          if (missingUrls.length > 0) {
+            throw new Error(`Failed to get download URLs for ${missingUrls.length} file(s)`);
+          }
+          
+          // Validate URL format
+          const invalidUrls = uploadedFileUrls.filter(url => !url.startsWith('http'));
+          if (invalidUrls.length > 0) {
+            throw new Error(`Invalid URL format received for ${invalidUrls.length} file(s)`);
+          }
+          
+          console.log('✅ All URLs validated successfully!');
+        } catch (uploadError) {
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('❌ STEP 1 FAILED: Firebase Storage upload error');
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('Error details:', {
+            message: uploadError.message,
+            code: uploadError.code,
+            stack: uploadError.stack
+          });
+          alert(`Error uploading files to Firebase Storage: ${uploadError.message}\n\nPlease check:\n1. Firebase configuration in .env file\n2. Browser console for details\n3. Firebase Storage rules allow uploads`);
+          setUploading(false);
           return;
         }
-        const updatedGender = genders[index] || audioItem.gender || 'male';
-        submitData.append('existingAudio', JSON.stringify({
-          ...audioItem,
-          gender: updatedGender === 'male' ? 'm' : 'f' // Convert back to short form for Firebase
-        }));
-      });
-      
-      // Send deleted audio indices
-      if (deletedExistingAudio.length > 0) {
-        submitData.append('deletedAudioIndices', JSON.stringify(deletedExistingAudio));
+      } else {
+        // No files to upload, skip to API call
+        console.log('ℹ️ No files to upload, skipping Firebase Storage upload');
+        setUploadProgress(5);
       }
 
-      // Handle newly selected files (only active ones)
-      const existingAudioCount = existingAudio.length;
+      // Step 2: Prepare metadata to send to backend
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📝 STEP 2: Preparing metadata with Firebase URLs');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const existingAudio = formData.audio || [];
+      const genders = formData.genders || [];
+      const newAudio = [];
+
+      // Add newly uploaded files to audio array
       activePreviews.forEach((preview, index) => {
-        const adjustedIndex = existingAudioCount + index;
-        submitData.append('audioFiles', preview.file);
-        submitData.append('genders', preview.gender === 'male' ? 'm' : 'f');
+        if (uploadedFileUrls[index]) {
+          const gender = preview.gender === 'male' ? 'm' : 'f';
+          newAudio.push({
+            audioUrl: uploadedFileUrls[index],
+            gender: gender
+          });
+          console.log(`📎 Audio item ${index + 1}:`, {
+            fileName: preview.name,
+            url: uploadedFileUrls[index],
+            gender: gender
+          });
+        }
       });
 
+      // Handle existing audio (with updated genders if changed)
+      const updatedExistingAudio = existingAudio
+        .map((audioItem, index) => {
+          if (deletedExistingAudio.includes(index)) {
+            return null; // Mark for deletion
+          }
+          const updatedGender = genders[index] || audioItem.gender || 'male';
+          return {
+            ...audioItem,
+            gender: updatedGender === 'male' ? 'm' : 'f',
+          };
+        })
+        .filter(item => item !== null); // Remove deleted items
+
+      // Combine existing and new audio
+      const allAudio = [...updatedExistingAudio, ...newAudio];
+
+      // Step 3: Send metadata to backend (as JSON, not FormData)
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 STEP 3: Sending metadata to backend (JSON only, NO files)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const submitData = {
+        title: formData.title,
+        description: formData.description,
+        categoryId: formData.categoryId,
+        categoryName: formData.categoryName,
+        audioUrl: formData.audioUrl || (allAudio.length > 0 ? allAudio[0].audioUrl : ''),
+        isPublished: formData.isPublished,
+        isPremium: formData.isPremium,
+        audio: allAudio,
+        // Include deleted audio indices for backend cleanup
+        ...(deletedExistingAudio.length > 0 && { deletedAudioIndices: deletedExistingAudio })
+      };
+
+      // Validate that we're sending JSON, not FormData
+      const isFormData = submitData instanceof FormData;
+      const payloadSize = JSON.stringify(submitData).length;
+      
+      console.log('📋 Payload Details:', {
+        isFormData: isFormData,
+        payloadType: isFormData ? 'FormData (❌ WRONG!)' : 'JSON (✅ CORRECT)',
+        payloadSize: `${(payloadSize / 1024).toFixed(2)} KB`,
+        hasAudio: allAudio.length > 0,
+        audioCount: allAudio.length,
+        audioUrls: allAudio.map(a => a.audioUrl).filter(Boolean),
+        title: submitData.title,
+        categoryId: submitData.categoryId
+      });
+      
+      if (isFormData) {
+        console.error('❌ ERROR: submitData is FormData! This should be a plain object.');
+        throw new Error('Invalid data format: Expected JSON object, got FormData');
+      }
+      
+      console.log('📦 Full payload (first 500 chars):', JSON.stringify(submitData).substring(0, 500));
+      console.log('🔗 All audio URLs in payload:', allAudio.map(a => a.audioUrl));
+
+      // Set progress to 98% (almost done, just API call remaining)
+      setUploadProgress(98);
+
+      // Send to backend (should be JSON, not FormData)
+      console.log(`📡 Sending ${editingItem ? 'UPDATE' : 'CREATE'} request to backend...`);
       if (editingItem) {
         // Optimistic update for editing
         const updatedItem = {
           ...editingItem,
           title: formData.title,
           description: formData.description,
-          audioUrl: formData.audioUrl,
+          audioUrl: formData.audioUrl || (allAudio.length > 0 ? allAudio[0].audioUrl : ''),
           isPublished: formData.isPublished,
           isPremium: formData.isPremium,
-          audio: formData.audio
+          audio: allAudio
         };
         setAudioItems(prev => prev.map(item => item.id === editingItem.id ? updatedItem : item));
 
         // Update in background
         try {
-          await updateGuidedAudio(editingItem.id, submitData, onUploadProgress, abortController.signal);
-          // Set to 100% when upload completes
+          await updateGuidedAudio(editingItem.id, submitData);
           setUploadProgress(100);
         } catch (error) {
           // If update fails, revert the optimistic change
@@ -727,17 +792,16 @@ const GuidedAudioManager = () => {
           description: formData.description,
           categoryId: formData.categoryId,
           categoryName: formData.categoryName,
-          audioUrl: formData.audioUrl,
+          audioUrl: formData.audioUrl || (allAudio.length > 0 ? allAudio[0].audioUrl : ''),
           isPublished: formData.isPublished,
           isPremium: formData.isPremium,
-          audio: formData.audio
+          audio: allAudio
         };
 
         setAudioItems(prev => [...prev, newItem]);
 
         try {
-          const createdItem = await createGuidedAudio(submitData, onUploadProgress, abortController.signal);
-          // Set to 100% when upload completes
+          const createdItem = await createGuidedAudio(submitData);
           setUploadProgress(100);
           // Replace temp item with real item
           setAudioItems(prev => prev.map(item => item.id === tempId ? createdItem : item));
@@ -747,6 +811,10 @@ const GuidedAudioManager = () => {
           throw error;
         }
       }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ STEP 3 COMPLETE: Content saved successfully!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Small delay to show 100% before closing
       setTimeout(() => {

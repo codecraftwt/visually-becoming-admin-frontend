@@ -51,11 +51,48 @@ export const getContentByCategory = (contentType, categoryId) => {
 
 /**
  * Create a content item
+ * 
+ * Now supports both:
+ * - JSON data (for direct Firebase Storage uploads - files pre-uploaded)
+ * - FormData (for legacy backend uploads)
  */
 export const createContent = (contentType, data, onUploadProgress, signal) => {
   const isFormData = data instanceof FormData;
+  
+  // Debug logging
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🌐 API CALL: createContent');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📋 Request Details:', {
+    contentType,
+    isFormData,
+    dataType: typeof data,
+    isPlainObject: data && typeof data === 'object' && !(data instanceof FormData),
+    hasMedia: data?.media?.length > 0,
+    mediaCount: data?.media?.length || 0,
+    payloadSize: isFormData ? 'N/A (FormData)' : `${JSON.stringify(data).length} bytes`
+  });
+  
+  if (isFormData) {
+    console.error('❌ ERROR: FormData detected! Files should be uploaded to Firebase Storage first.');
+    console.error('⚠️ This request will hit Vercel\'s 4.5MB limit if files are included.');
+    console.error('🔍 Check why files are being sent instead of URLs.');
+  } else {
+    console.log('✅ Sending JSON (not FormData) - files should already be in Firebase Storage');
+    console.log('🔗 Media URLs being sent:', data?.media?.map(m => m.url) || []);
+    console.log('📊 Payload preview:', {
+      title: data?.title,
+      categoryId: data?.categoryId,
+      mediaCount: data?.media?.length || 0,
+      mediaTypes: data?.media?.map(m => m.type) || []
+    });
+  }
+  
   const config = {
-    ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+    ...(isFormData 
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : { headers: { 'Content-Type': 'application/json' } }
+    ),
     ...(onUploadProgress ? { onUploadProgress } : {}),
     ...(signal ? { signal } : {})
   };
@@ -64,11 +101,49 @@ export const createContent = (contentType, data, onUploadProgress, signal) => {
 
 /**
  * Update a content item
+ * 
+ * Now supports both:
+ * - JSON data (for direct Firebase Storage uploads - files pre-uploaded)
+ * - FormData (for legacy backend uploads)
  */
 export const updateContent = (contentType, id, data, onUploadProgress, signal) => {
   const isFormData = data instanceof FormData;
+  
+  // Debug logging
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🌐 API CALL: updateContent');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📋 Request Details:', {
+    contentType,
+    id,
+    isFormData,
+    dataType: typeof data,
+    isPlainObject: data && typeof data === 'object' && !(data instanceof FormData),
+    hasMedia: data?.media?.length > 0,
+    mediaCount: data?.media?.length || 0,
+    payloadSize: isFormData ? 'N/A (FormData)' : `${JSON.stringify(data).length} bytes`
+  });
+  
+  if (isFormData) {
+    console.error('❌ ERROR: FormData detected! Files should be uploaded to Firebase Storage first.');
+    console.error('⚠️ This request will hit Vercel\'s 4.5MB limit if files are included.');
+    console.error('🔍 Check why files are being sent instead of URLs.');
+  } else {
+    console.log('✅ Sending JSON (not FormData) - files should already be in Firebase Storage');
+    console.log('🔗 Media URLs being sent:', data?.media?.map(m => m.url) || []);
+    console.log('📊 Payload preview:', {
+      title: data?.title,
+      categoryId: data?.categoryId,
+      mediaCount: data?.media?.length || 0,
+      mediaTypes: data?.media?.map(m => m.type) || []
+    });
+  }
+  
   const config = {
-    ...(isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+    ...(isFormData 
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : { headers: { 'Content-Type': 'application/json' } }
+    ),
     ...(onUploadProgress ? { onUploadProgress } : {}),
     ...(signal ? { signal } : {})
   };

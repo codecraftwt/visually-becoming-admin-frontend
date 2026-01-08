@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { uploadFilesToStorage } from '../../services/firebaseStorageService';
 import {
   Box,
   Button,
@@ -408,61 +409,8 @@ const GuidedContentManager = ({ contentType }) => {
     // Calculate total file size for progress tracking
     const activePreviews = localFilePreviews.filter(p => p.status === 'active');
     const totalSize = activePreviews.reduce((sum, preview) => sum + (preview.file?.size || 0), 0);
+    const filesToUpload = activePreviews.map(p => p.file);
     
-    if (totalSize === 0 && activePreviews.length === 0) {
-      // No files to upload, proceed without progress tracking
-      setUploading(true);
-      try {
-        const submitData = new FormData();
-        submitData.append('title', formData.title);
-        submitData.append('description', formData.description);
-        submitData.append('categoryId', formData.categoryId);
-        submitData.append('categoryName', formData.categoryName);
-        submitData.append('isPublished', formData.isPublished);
-        submitData.append('isPremium', formData.isPremium);
-
-        const existingMedia = formData.media || [];
-        const genders = formData.genders || [];
-
-        existingMedia.forEach((mediaItem, index) => {
-          if (!deletedExistingMedia.includes(index)) {
-            const updatedGender = genders[index] || mediaItem.gender || 'male';
-            submitData.append('existingMedia', JSON.stringify({
-              ...mediaItem,
-              gender: updatedGender === 'male' ? 'm' : 'f',
-            }));
-          }
-        });
-
-        if (deletedExistingMedia.length > 0) {
-          submitData.append('deletedMediaIndices', JSON.stringify(deletedExistingMedia));
-        }
-
-        if (config.supportsYouTube && formData.youtubeUrls && formData.youtubeUrls.length > 0) {
-          formData.youtubeUrls.forEach(url => {
-            if (url) submitData.append('youtubeUrls', url);
-          });
-        }
-
-        if (editingItem) {
-          await updateContent(contentType, editingItem.id, submitData);
-        } else {
-          await createContent(contentType, submitData);
-        }
-
-        await loadContentItems(selectedCategory.id);
-        handleItemClose();
-      } catch (error) {
-        if (error.name !== 'CanceledError') {
-          console.error('Error saving content item:', error);
-          alert('Error saving content item. Please try again.');
-        }
-      } finally {
-        setUploading(false);
-      }
-      return;
-    }
-
     // Initialize upload progress tracking
     setTotalFileSize(totalSize);
     setUploadedBytes(0);
@@ -472,122 +420,272 @@ const GuidedContentManager = ({ contentType }) => {
     setUploadStartTime(Date.now());
     setUploading(true);
 
-    // Create AbortController for cancel functionality
-    const abortController = new AbortController();
-    setUploadCancelController(abortController);
-
-    // Track upload progress
-    let lastLoaded = 0;
+    // Track upload progress for Firebase Storage
+    const fileProgress = {}; // Track progress for each file
     let lastTime = Date.now();
+    let lastTotalUploaded = 0;
 
-    const onUploadProgress = (progressEvent) => {
-      // Handle both lengthComputable and non-lengthComputable cases
-      if (progressEvent.lengthComputable && progressEvent.total > 0) {
-        const loaded = progressEvent.loaded;
-        const total = progressEvent.total;
-        
-        // Cap progress at 90% until we get the response (remaining 10% is for server processing/Firebase upload)
-        const rawPercent = (loaded / total) * 100;
-        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
-        
-        setUploadedBytes(loaded);
-        setUploadProgress(percentCompleted);
+    const onFirebaseProgress = (fileIndex, bytesTransferred, totalBytes, progress) => {
+      // Track progress for this specific file
+      fileProgress[fileIndex] = { bytesTransferred, totalBytes, progress };
+      
+      // Calculate total progress across all files
+      let totalUploadedBytes = 0;
+      let totalBytesAll = 0;
+      Object.values(fileProgress).forEach(fileProg => {
+        totalUploadedBytes += fileProg.bytesTransferred;
+        totalBytesAll += fileProg.totalBytes;
+      });
+      
+      // If no files, use totalSize as fallback
+      const effectiveTotal = totalBytesAll > 0 ? totalBytesAll : totalSize;
+      const overallProgress = effectiveTotal > 0 
+        ? (totalUploadedBytes / effectiveTotal) * 100 
+        : 0;
+      
+      setUploadedBytes(totalUploadedBytes);
+      setUploadProgress(Math.min(Math.round(overallProgress * 0.95), 95)); // Cap at 95% for file upload, 5% for API call
 
-        // Calculate upload speed
-        const currentTime = Date.now();
-        const timeDiff = (currentTime - lastTime) / 1000; // seconds
-        const bytesDiff = loaded - lastLoaded;
+      // Calculate upload speed
+      const currentTime = Date.now();
+      const timeDiff = (currentTime - lastTime) / 1000; // seconds
+      const bytesDiff = totalUploadedBytes - lastTotalUploaded;
+      
+      if (timeDiff > 0 && bytesDiff > 0) {
+        const speed = bytesDiff / timeDiff; // bytes per second
+        setUploadSpeed(speed);
         
-        if (timeDiff > 0 && bytesDiff > 0) {
-          const speed = bytesDiff / timeDiff; // bytes per second
-          setUploadSpeed(speed);
-          
-          // Calculate time remaining (accounting for 90% cap)
-          const remaining = total - loaded;
-          if (speed > 0) {
-            const remainingSeconds = (remaining / speed) * 1.1; // Add 10% buffer for server processing
-            setTimeRemaining(remainingSeconds);
-          }
+        // Calculate time remaining
+        const remaining = effectiveTotal - totalUploadedBytes;
+        if (speed > 0 && remaining > 0) {
+          const remainingSeconds = remaining / speed;
+          setTimeRemaining(remainingSeconds);
         }
-        
-        lastLoaded = loaded;
-        lastTime = currentTime;
-      } else if (progressEvent.loaded > 0) {
-        // Fallback: estimate progress based on loaded bytes if total is unknown
-        const loaded = progressEvent.loaded;
-        const estimatedTotal = totalSize || loaded * 2; // Rough estimate
-        const rawPercent = (loaded / estimatedTotal) * 100;
-        const percentCompleted = Math.min(Math.round(rawPercent * 0.9), 90);
-        
-        setUploadedBytes(loaded);
-        setUploadProgress(percentCompleted);
       }
+      
+      lastTotalUploaded = totalUploadedBytes;
+      lastTime = currentTime;
     };
 
     try {
-      const submitData = new FormData();
-      submitData.append('title', formData.title);
-      submitData.append('description', formData.description);
-      submitData.append('categoryId', formData.categoryId);
-      submitData.append('categoryName', formData.categoryName);
-      submitData.append('isPublished', formData.isPublished);
-      submitData.append('isPremium', formData.isPremium);
+      let uploadedFileUrls = [];
 
-      // Handle existing media
-      const existingMedia = formData.media || [];
-      const genders = formData.genders || [];
-
-      existingMedia.forEach((mediaItem, index) => {
-        if (!deletedExistingMedia.includes(index)) {
-          const updatedGender = genders[index] || mediaItem.gender || 'male';
-          submitData.append('existingMedia', JSON.stringify({
-            ...mediaItem,
-            gender: updatedGender === 'male' ? 'm' : 'f',
-          }));
+      // Step 1: Upload files directly to Firebase Storage (if any)
+      if (filesToUpload.length > 0) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('🚀 STEP 1: Starting direct Firebase Storage upload');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📊 Upload Summary:', {
+          fileCount: filesToUpload.length,
+          totalSize: `${(totalSize / 1024 / 1024).toFixed(2)} MB`,
+          contentType: contentType,
+          files: filesToUpload.map(f => ({
+            name: f.name,
+            size: `${(f.size / 1024 / 1024).toFixed(2)} MB`,
+            type: f.type
+          }))
+        });
+        
+        try {
+          uploadedFileUrls = await uploadFilesToStorage(
+            filesToUpload,
+            contentType,
+            onFirebaseProgress
+          );
+          
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('✅ STEP 1 COMPLETE: Files uploaded to Firebase Storage');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('🔗 Received URLs:', uploadedFileUrls);
+          console.log('📋 URL Validation:', {
+            urlCount: uploadedFileUrls.length,
+            expectedCount: filesToUpload.length,
+            allUrlsValid: uploadedFileUrls.every(url => url && url.startsWith('http')),
+            urls: uploadedFileUrls.map((url, i) => ({
+              index: i + 1,
+              fileName: filesToUpload[i].name,
+              url: url,
+              isValid: url && url.startsWith('http'),
+              urlPreview: url ? url.substring(0, 80) + '...' : 'MISSING'
+            }))
+          });
+          
+          // Validate that we got URLs back
+          if (!uploadedFileUrls || uploadedFileUrls.length === 0) {
+            throw new Error('No download URLs received from Firebase Storage');
+          }
+          
+          // Check if any URL is missing
+          const missingUrls = uploadedFileUrls.filter(url => !url);
+          if (missingUrls.length > 0) {
+            throw new Error(`Failed to get download URLs for ${missingUrls.length} file(s)`);
+          }
+          
+          // Validate URL format
+          const invalidUrls = uploadedFileUrls.filter(url => !url.startsWith('http'));
+          if (invalidUrls.length > 0) {
+            throw new Error(`Invalid URL format received for ${invalidUrls.length} file(s)`);
+          }
+          
+          console.log('✅ All URLs validated successfully!');
+        } catch (uploadError) {
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('❌ STEP 1 FAILED: Firebase Storage upload error');
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('Error details:', {
+            message: uploadError.message,
+            code: uploadError.code,
+            stack: uploadError.stack
+          });
+          alert(`Error uploading files to Firebase Storage: ${uploadError.message}\n\nPlease check:\n1. Firebase configuration in .env file\n2. Browser console for details\n3. Firebase Storage rules allow uploads`);
+          setUploading(false);
+          return;
         }
-      });
-
-      if (deletedExistingMedia.length > 0) {
-        submitData.append('deletedMediaIndices', JSON.stringify(deletedExistingMedia));
+      } else {
+        // No files to upload, skip to API call
+        console.log('ℹ️ No files to upload, skipping Firebase Storage upload');
+        setUploadProgress(5);
       }
 
-      // Handle new file uploads
-      const existingMediaCount = existingMedia.length;
+      // Step 2: Prepare metadata to send to backend
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📝 STEP 2: Preparing metadata with Firebase URLs');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const existingMedia = formData.media || [];
+      const genders = formData.genders || [];
+      const newMedia = [];
+
+      // Add newly uploaded files to media array
       activePreviews.forEach((preview, index) => {
-        submitData.append('mediaFiles', preview.file);
-        if (config.supportsGender) {
-          submitData.append('genders', preview.gender === 'male' ? 'm' : 'f');
+        if (uploadedFileUrls[index]) {
+          const gender = preview.gender === 'male' ? 'm' : 'f';
+          const mediaItem = {
+            type: 'audio',
+            url: uploadedFileUrls[index],
+            ...(config.supportsGender && { gender })
+          };
+          newMedia.push(mediaItem);
+          console.log(`📎 Media item ${index + 1}:`, {
+            fileName: preview.name,
+            url: uploadedFileUrls[index],
+            gender: gender,
+            mediaItem: mediaItem
+          });
         }
       });
+      
+      console.log('📦 New media items created:', newMedia.length);
+
+      // Handle existing media (with updated genders if changed)
+      const updatedExistingMedia = existingMedia
+        .map((mediaItem, index) => {
+          if (deletedExistingMedia.includes(index)) {
+            return null; // Mark for deletion
+          }
+          const updatedGender = genders[index] || mediaItem.gender || 'male';
+          return {
+            ...mediaItem,
+            gender: updatedGender === 'male' ? 'm' : 'f',
+          };
+        })
+        .filter(item => item !== null); // Remove deleted items
 
       // Handle YouTube URLs
       if (config.supportsYouTube && formData.youtubeUrls && formData.youtubeUrls.length > 0) {
         formData.youtubeUrls.forEach(url => {
-          if (url) submitData.append('youtubeUrls', url);
+          if (url) {
+            // Extract YouTube video ID (simple check, backend will validate)
+            const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+            if (videoIdMatch) {
+              newMedia.push({
+                type: 'youtube',
+                url: url,
+                videoId: videoIdMatch[1]
+              });
+            }
+          }
         });
       }
 
-      if (editingItem) {
-        await updateContent(contentType, editingItem.id, submitData, onUploadProgress, abortController.signal);
-        // Set to 100% when upload completes
-        setUploadProgress(100);
-      } else {
-        await createContent(contentType, submitData, onUploadProgress, abortController.signal);
-        // Set to 100% when upload completes
-        setUploadProgress(100);
+      // Combine existing and new media
+      const allMedia = [...updatedExistingMedia, ...newMedia];
+
+      // Step 3: Send metadata to backend (as JSON, not FormData)
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 STEP 3: Sending metadata to backend (JSON only, NO files)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const submitData = {
+        title: formData.title,
+        description: formData.description,
+        categoryId: formData.categoryId,
+        categoryName: formData.categoryName,
+        isPublished: formData.isPublished,
+        isPremium: formData.isPremium,
+        media: allMedia,
+        // Include deleted media indices for backend cleanup
+        ...(deletedExistingMedia.length > 0 && { deletedMediaIndices: deletedExistingMedia })
+      };
+
+      // Validate that we're sending JSON, not FormData
+      const isFormData = submitData instanceof FormData;
+      const payloadSize = JSON.stringify(submitData).length;
+      
+      console.log('📋 Payload Details:', {
+        contentType: contentType,
+        isFormData: isFormData,
+        payloadType: isFormData ? 'FormData (❌ WRONG!)' : 'JSON (✅ CORRECT)',
+        payloadSize: `${(payloadSize / 1024).toFixed(2)} KB`,
+        hasMedia: allMedia.length > 0,
+        mediaCount: allMedia.length,
+        mediaUrls: allMedia.map(m => m.url).filter(Boolean),
+        title: submitData.title,
+        categoryId: submitData.categoryId
+      });
+      
+      if (isFormData) {
+        console.error('❌ ERROR: submitData is FormData! This should be a plain object.');
+        throw new Error('Invalid data format: Expected JSON object, got FormData');
       }
+      
+      console.log('📦 Full payload (first 500 chars):', JSON.stringify(submitData).substring(0, 500));
+      console.log('🔗 All media URLs in payload:', allMedia.map(m => m.url));
+
+      // Set progress to 98% (almost done, just API call remaining)
+      setUploadProgress(98);
+
+      // Send to backend (should be JSON, not FormData)
+      console.log(`📡 Sending ${editingItem ? 'UPDATE' : 'CREATE'} request to backend...`);
+      if (editingItem) {
+        await updateContent(contentType, editingItem.id, submitData);
+      } else {
+        await createContent(contentType, submitData);
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ STEP 3 COMPLETE: Content saved successfully!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // Set to 100% when complete
+      setUploadProgress(100);
 
       // Small delay to show 100% before closing
       setTimeout(() => {
-        loadContentItems(selectedCategory.id).then(() => {
+        // Use formData.categoryId as fallback if selectedCategory is null
+        const categoryId = selectedCategory?.id || formData.categoryId;
+        if (categoryId) {
+          loadContentItems(categoryId).then(() => {
+            handleItemClose();
+          });
+        } else {
+          // If no category ID, just close the dialog
           handleItemClose();
-        });
+        }
       }, 300);
     } catch (error) {
-      if (error.name !== 'CanceledError' && !axios.isCancel(error)) {
-        console.error('Error saving content item:', error);
-        alert('Error saving content item. Please try again.');
-      }
+      console.error('Error saving content item:', error);
+      alert('Error saving content item. Please try again.');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -606,7 +704,10 @@ const GuidedContentManager = ({ contentType }) => {
     if (window.confirm(`Are you sure you want to delete "${selectedItem.title}"?`)) {
       try {
         await deleteContent(contentType, selectedItem.id);
-        await loadContentItems(selectedCategory.id);
+        const categoryId = selectedCategory?.id || selectedItem.categoryId;
+        if (categoryId) {
+          await loadContentItems(categoryId);
+        }
         handleItemMenuClose();
       } catch (error) {
         console.error('Error deleting item:', error);
@@ -620,7 +721,10 @@ const GuidedContentManager = ({ contentType }) => {
       await updateContent(contentType, item.id, {
         isPublished: !item.isPublished,
       });
-      await loadContentItems(selectedCategory.id);
+      const categoryId = selectedCategory?.id || item.categoryId;
+      if (categoryId) {
+        await loadContentItems(categoryId);
+      }
     } catch (error) {
       console.error('Error updating item:', error);
       alert('Error updating item. Please try again.');
@@ -632,7 +736,10 @@ const GuidedContentManager = ({ contentType }) => {
       await updateContent(contentType, item.id, {
         isPremium: !item.isPremium,
       });
-      await loadContentItems(selectedCategory.id);
+      const categoryId = selectedCategory?.id || item.categoryId;
+      if (categoryId) {
+        await loadContentItems(categoryId);
+      }
     } catch (error) {
       console.error('Error updating item:', error);
       alert('Error updating item. Please try again.');

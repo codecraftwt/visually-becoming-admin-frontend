@@ -19,11 +19,8 @@ import GuidedContentManager from './guided-content/GuidedContentManager';
 const GuidedVisualizationsManager = ({ categories, onDataUpdate }) => {
   // This component is now just a wrapper that uses the generic component
   // All the UI, categories, file uploads, YouTube support, etc. are handled by GuidedContentManager
-  return <div>
-    <h1>GuidedVisualizationsManager</h1>
-    comming soon...
-  </div>;
-  // return <GuidedContentManager contentType="visualization" />;
+
+  return <GuidedContentManager contentType="visualization" />;
 };
 
 export default GuidedVisualizationsManager;
