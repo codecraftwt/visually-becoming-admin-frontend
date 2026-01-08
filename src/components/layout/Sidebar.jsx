@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Drawer,
   List,
@@ -25,22 +26,23 @@ import {
 
 import logo from '../../assets/vblogo.png';
 
-const Sidebar = ({ open, onClose, menuItems, currentTab, onTabChange, darkMode }) => {
+const Sidebar = ({ open, onClose, menuItems, currentPath, onNavigation, darkMode }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const location = useLocation();
 
-  const getIcon = (index) => {
-    const icons = [
-      <DashboardIcon />,
-      <TodayIcon />,
-      <CategoryIcon />,
-      <QuoteIcon />,
-      <AudioIcon />,
-      <MeditationIcon />,
-      <VisualizationIcon />,
-      <NotificationsIcon />
-    ];
-    return icons[index];
+  const getIcon = (iconName) => {
+    const iconMap = {
+      'dashboard': <DashboardIcon />,
+      'today': <TodayIcon />,
+      'category': <CategoryIcon />,
+      'affirmation': <QuoteIcon />,
+      'audio': <AudioIcon />,
+      'meditation': <MeditationIcon />,
+      'visualization': <VisualizationIcon />,
+      'notifications': <NotificationsIcon />
+    };
+    return iconMap[iconName] || <DashboardIcon />;
   };
 
   const drawerWidth = 260;
@@ -77,42 +79,51 @@ const Sidebar = ({ open, onClose, menuItems, currentTab, onTabChange, darkMode }
 
       {/* Navigation */}
       <List sx={{ flexGrow: 1, p: 2, overflowY: 'auto', overflowX: 'hidden' }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.label} disablePadding sx={{ mb: 1 }}>
-            <ListItemButton
-              selected={currentTab === item.index}
-              onClick={() => onTabChange(null, item.index)}
-              sx={{
-                borderRadius: 2,
-                '&.Mui-selected': {
-                  backgroundColor: theme.palette.primary.main,
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: theme.palette.primary.dark,
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: theme.palette.action.hover,
-                },
-              }}
-            >
-              <ListItemIcon sx={{
-                color: currentTab === item.index ? 'white' : 'inherit',
-                minWidth: 40,
-                flexShrink: 0
-              }}>
-                {getIcon(item.index)}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                primaryTypographyProps={{
-                  fontWeight: currentTab === item.index ? 600 : 400,
-                  noWrap: true
+        {menuItems.map((item) => {
+          const isSelected = location.pathname === item.path;
+          return (
+            <ListItem key={item.label} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                component={Link}
+                to={item.path}
+                selected={isSelected}
+                onClick={() => {
+                  if (onNavigation) {
+                    onNavigation();
+                  }
                 }}
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    backgroundColor: theme.palette.primary.main,
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                    },
+                  },
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{
+                  color: isSelected ? 'white' : 'inherit',
+                  minWidth: 40,
+                  flexShrink: 0
+                }}>
+                  {getIcon(item.icon)}
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontWeight: isSelected ? 600 : 400,
+                    noWrap: true
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
 
       {/* Footer */}

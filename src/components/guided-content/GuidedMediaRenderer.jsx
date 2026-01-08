@@ -49,8 +49,22 @@ const extractYouTubeId = (url) => {
 /**
  * Audio Player Component
  */
-const AudioPlayer = ({ media, onPlay, onPause, isPlaying, currentTime, duration, muted, onTimeUpdate, onMuteToggle, onProgressChange }) => {
+const AudioPlayer = ({ media, onPlay, onPause, isPlaying, currentTime, duration, muted, onTimeUpdate, onMuteToggle, onProgressChange, audioRefCallback, onLoadedMetadata }) => {
   const audioRef = useRef(null);
+
+  // Call the callback to pass the ref to parent
+  // Store callback in ref to avoid dependency issues
+  const callbackRef = useRef(audioRefCallback);
+  useEffect(() => {
+    callbackRef.current = audioRefCallback;
+  });
+
+  // Only call callback when audio element is ready, and only once
+  useEffect(() => {
+    if (audioRef.current && callbackRef.current) {
+      callbackRef.current(audioRef);
+    }
+  }, []); // Empty deps - only run once on mount
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -61,7 +75,12 @@ const AudioPlayer = ({ media, onPlay, onPause, isPlaying, currentTime, duration,
     };
 
     const handleLoadedMetadata = () => {
-      if (onTimeUpdate) onTimeUpdate(audio.currentTime);
+      if (onLoadedMetadata) {
+        onLoadedMetadata();
+      }
+      if (onTimeUpdate) {
+        onTimeUpdate(audio.currentTime);
+      }
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -71,7 +90,7 @@ const AudioPlayer = ({ media, onPlay, onPause, isPlaying, currentTime, duration,
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, onLoadedMetadata]);
 
   return (
     <Box>
@@ -253,7 +272,7 @@ const YouTubePlayer = ({ media }) => {
  * Main Media Renderer Component
  * Renders appropriate player based on media type
  */
-const GuidedMediaRenderer = ({ media, contentType, config, onPlay, onPause, isPlaying, currentTime, duration, muted, onTimeUpdate, onMuteToggle, onProgressChange }) => {
+const GuidedMediaRenderer = ({ media, contentType, config, onPlay, onPause, isPlaying, currentTime, duration, muted, onTimeUpdate, onMuteToggle, onProgressChange, audioRefCallback, onLoadedMetadata }) => {
   const normalizeGender = (gender) => {
     if (gender === 'm') return 'male';
     if (gender === 'f') return 'female';
@@ -303,6 +322,8 @@ const GuidedMediaRenderer = ({ media, contentType, config, onPlay, onPause, isPl
           onTimeUpdate={onTimeUpdate}
           onMuteToggle={onMuteToggle}
           onProgressChange={onProgressChange}
+          audioRefCallback={audioRefCallback}
+          onLoadedMetadata={onLoadedMetadata}
         />
       </Box>
     );

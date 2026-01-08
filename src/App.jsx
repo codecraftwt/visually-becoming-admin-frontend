@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -36,26 +37,11 @@ import DailyNotificationsManager from './components/DailyNotificationsManager';
 import { getCategories } from './services/api';
 import LoginPage from './components/LoginPage';
 
-// Tab Panel Component
-function TabPanel({ children, value, index, ...other }) {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`tabpanel-${index}`}
-      aria-labelledby={`tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: { xs: 0, sm: 1, md: 3 } }}>{children}</Box>}
-    </div>
-  );
-}
-
-// Main App Component
-function App() {
+// Main App Layout Component (used inside Router)
+function AppLayout() {
+  const location = useLocation();
   // State Management
   const [darkMode, setDarkMode] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [categories, setCategories] = useState([]);
   const [Login, setLogin] = useState(true); // Temporarily set to true for debugging
@@ -64,17 +50,24 @@ function App() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const theme = darkMode ? darkTheme : lightTheme;
 
-  // Menu Items Configuration
+  // Menu Items Configuration with routes
   const menuItems = [
-    { label: 'Dashboard', index: 0, icon: 'dashboard' },
-    { label: "Today's Content", index: 1, icon: 'today' },
-    { label: 'Categories', index: 2, icon: 'category' },
-    { label: 'Daily Affirmations', index: 3, icon: 'affirmation' },
-    { label: 'Guided Audio', index: 4, icon: 'audio' },
-    { label: 'Guided Meditations', index: 5, icon: 'meditation' },
-    { label: 'Guided Visualizations', index: 6, icon: 'visualization' },
-    { label: 'Daily Notifications', index: 7, icon: 'notifications' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
+    { label: "Today's Content", path: '/todays-content', icon: 'today' },
+    { label: 'Categories', path: '/categories', icon: 'category' },
+    { label: 'Daily Affirmations', path: '/daily-affirmations', icon: 'affirmation' },
+    { label: 'Guided Audio', path: '/guided-audio', icon: 'audio' },
+    { label: 'Guided Meditations', path: '/guided-meditations', icon: 'meditation' },
+    { label: 'Guided Visualizations', path: '/guided-visualization', icon: 'visualization' },
+    { label: 'Daily Notifications', path: '/daily-notification', icon: 'notifications' },
   ];
+
+  // Get current active route index
+  const getCurrentRouteIndex = () => {
+    const currentPath = location.pathname;
+    const index = menuItems.findIndex(item => item.path === currentPath);
+    return index >= 0 ? index : 0;
+  };
 
   // Effects
   useEffect(() => {
@@ -100,8 +93,7 @@ function App() {
   };
 
   // Event Handlers
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+  const handleSidebarNavigation = () => {
     // Close sidebar on mobile when navigating
     if (isMobile) {
       setSidebarOpen(false);
@@ -144,8 +136,8 @@ function App() {
           open={sidebarOpen}
           onClose={handleSidebarClose}
           menuItems={menuItems}
-          currentTab={tabValue}
-          onTabChange={handleTabChange}
+          currentPath={location.pathname}
+          onNavigation={handleSidebarNavigation}
           darkMode={darkMode}
           isMobile={isMobile}
           drawerWidth={drawerWidth}
@@ -269,58 +261,62 @@ function App() {
               }}
             >
               
-              {/* Tab Panels */}
-              <TabPanel value={tabValue} index={0}>
-                <DashboardOverview 
-                  categories={categories} 
-                  onCategoriesUpdate={loadCategories}
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={1}>
-                <TodayContent 
-                  categories={categories} 
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={2}>
-                <CategoryManager 
-                  categories={categories} 
-                  onCategoriesUpdate={loadCategories} 
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={3}>
-                <DailyAffirmationsManager 
-                  categories={categories} 
-                  onDataUpdate={loadCategories}
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={4}>
-                <GuidedAudioManager />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={5}>
-                <GuidedMeditationsManager 
-                  categories={categories} 
-                  onDataUpdate={loadCategories}
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={6}>
-                <GuidedVisualizationsManager 
-                  categories={categories} 
-                  onDataUpdate={loadCategories}
-                />
-              </TabPanel>
-              
-              <TabPanel value={tabValue} index={7}>
-                <DailyNotificationsManager 
-                  categories={categories} 
-                  onDataUpdate={loadCategories}
-                />
-              </TabPanel>
+              {/* Routes */}
+              <Routes>
+                <Route path="/dashboard" element={
+                  <DashboardOverview 
+                    categories={categories} 
+                    onCategoriesUpdate={loadCategories}
+                  />
+                } />
+                
+                <Route path="/todays-content" element={
+                  <TodayContent 
+                    categories={categories} 
+                  />
+                } />
+                
+                <Route path="/categories" element={
+                  <CategoryManager 
+                    categories={categories} 
+                    onCategoriesUpdate={loadCategories} 
+                  />
+                } />
+                
+                <Route path="/daily-affirmations" element={
+                  <DailyAffirmationsManager 
+                    categories={categories} 
+                    onDataUpdate={loadCategories}
+                  />
+                } />
+                
+                <Route path="/guided-audio" element={
+                  <GuidedAudioManager />
+                } />
+                
+                <Route path="/guided-meditations" element={
+                  <GuidedMeditationsManager 
+                    categories={categories} 
+                    onDataUpdate={loadCategories}
+                  />
+                } />
+                
+                <Route path="/guided-visualization" element={
+                  <GuidedVisualizationsManager 
+                    categories={categories} 
+                    onDataUpdate={loadCategories}
+                  />
+                } />
+                
+                <Route path="/daily-notification" element={
+                  <DailyNotificationsManager 
+                    categories={categories} 
+                    onDataUpdate={loadCategories}
+                  />
+                } />
+                
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
               
             </Container>
           </Box>
@@ -350,6 +346,15 @@ function App() {
       </Box>
     </ThemeProvider>}
     </>
+  );
+}
+
+// Main App Component with Router
+function App() {
+  return (
+    <Router>
+      <AppLayout />
+    </Router>
   );
 }
 

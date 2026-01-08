@@ -10,7 +10,7 @@
  *   <GuidedContentManager contentType="visualization" />
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { uploadFilesToStorage } from '../../services/firebaseStorageService';
 import {
@@ -1076,6 +1076,53 @@ const GuidedContentManager = ({ contentType }) => {
   // Helper functions
   const getCardMediaKey = (itemId, mediaIndex) => `${itemId}-${mediaIndex}`;
 
+  // Handle card media play/pause
+  const handleCardMediaPlay = (mediaKey) => {
+    // Pause all other playing media
+    Object.keys(cardMediaStates).forEach(key => {
+      if (key !== mediaKey && cardMediaStates[key]?.playing) {
+        const audioRef = cardMediaRefs.current[key];
+        if (audioRef && audioRef.current) {
+          audioRef.current.pause();
+          setCardMediaStates(prev => ({
+            ...prev,
+            [key]: { ...prev[key], playing: false }
+          }));
+        }
+      }
+    });
+
+    // Update state for the playing media
+    setCardMediaStates(prev => ({
+      ...prev,
+      [mediaKey]: { ...prev[mediaKey], playing: true }
+    }));
+  };
+
+  const handleCardMediaPause = (mediaKey) => {
+    setCardMediaStates(prev => ({
+      ...prev,
+      [mediaKey]: { ...prev[mediaKey], playing: false }
+    }));
+  };
+
+  const handleCardMediaLoadedMetadata = useCallback((mediaKey) => {
+    const audioRef = cardMediaRefs.current[mediaKey];
+    if (audioRef && audioRef.current && audioRef.current.duration) {
+      setCardMediaStates(prev => {
+        const currentDuration = prev[mediaKey]?.duration || 0;
+        // Only update if duration actually changed
+        if (currentDuration !== audioRef.current.duration) {
+          return {
+            ...prev,
+            [mediaKey]: { ...prev[mediaKey], duration: audioRef.current.duration }
+          };
+        }
+        return prev;
+      });
+    }
+  }, []);
+
   const normalizeGender = (gender) => {
     if (gender === 'm') return 'male';
     if (gender === 'f') return 'female';
@@ -1306,6 +1353,9 @@ const GuidedContentManager = ({ contentType }) => {
                   cardMediaRefs={cardMediaRefs}
                   getCardMediaKey={getCardMediaKey}
                   setCardMediaStates={setCardMediaStates}
+                  onCardMediaPlay={handleCardMediaPlay}
+                  onCardMediaPause={handleCardMediaPause}
+                  onCardMediaLoadedMetadata={handleCardMediaLoadedMetadata}
                 />
               </Grid>
             ))}
@@ -2293,7 +2343,7 @@ const CategoryCard = ({ category, selected, onSelect, onEdit, onDelete, onToggle
 );
 
 // Content Card Component
-const ContentCard = ({ item, contentType, config, onEdit, onDelete, onTogglePublished, onTogglePremium, cardMediaStates, cardMediaRefs, getCardMediaKey, setCardMediaStates }) => (
+const ContentCard = ({ item, contentType, config, onEdit, onDelete, onTogglePublished, onTogglePremium, cardMediaStates, cardMediaRefs, getCardMediaKey, setCardMediaStates, onCardMediaPlay, onCardMediaPause, onCardMediaLoadedMetadata }) => (
   <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease', border: '1px solid', borderColor: 'divider', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } }}>
     <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
@@ -2327,6 +2377,23 @@ const ContentCard = ({ item, contentType, config, onEdit, onDelete, onTogglePubl
                   currentTime={mediaState.currentTime}
                   duration={mediaState.duration}
                   muted={mediaState.muted}
+                  audioRefCallback={(audioRef) => {
+                    // Only update the ref, don't call setState here to avoid infinite loops
+                    if (audioRef) {
+                      cardMediaRefs.current[mediaKey] = audioRef;
+                    } else {
+                      delete cardMediaRefs.current[mediaKey];
+                    }
+                  }}
+                  onLoadedMetadata={() => {
+                    onCardMediaLoadedMetadata && onCardMediaLoadedMetadata(mediaKey);
+                  }}
+                  onPlay={() => {
+                    onCardMediaPlay && onCardMediaPlay(mediaKey);
+                  }}
+                  onPause={() => {
+                    onCardMediaPause && onCardMediaPause(mediaKey);
+                  }}
                   onTimeUpdate={(time) => {
                     setCardMediaStates(prev => ({
                       ...prev,
@@ -2340,6 +2407,10 @@ const ContentCard = ({ item, contentType, config, onEdit, onDelete, onTogglePubl
                     }));
                   }}
                   onProgressChange={(time) => {
+                    const audioRef = cardMediaRefs.current[mediaKey];
+                    if (audioRef && audioRef.current) {
+                      audioRef.current.currentTime = time;
+                    }
                     setCardMediaStates(prev => ({
                       ...prev,
                       [mediaKey]: { ...prev[mediaKey], currentTime: time }
