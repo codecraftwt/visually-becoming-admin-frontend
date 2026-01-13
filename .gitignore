@@ -24,3 +24,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Windows reserved device names (cannot be handled by git)
+nul
+CON
+PRN
+AUX
+COM1-9
+LPT1-9
