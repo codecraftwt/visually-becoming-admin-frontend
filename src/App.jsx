@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -11,12 +11,14 @@ import {
   CssBaseline,
   ThemeProvider,
   IconButton,
+  Button,
   useMediaQuery
 } from '@mui/material';
 import {
   Brightness4 as DarkIcon,
   Brightness7 as LightIcon,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 
 // Themes
@@ -34,17 +36,19 @@ import GuidedVisualizationsManager from './components/GuidedVisualizationsManage
 import DailyNotificationsManager from './components/DailyNotificationsManager';
 
 // Services
-import { getCategories } from './services/api';
+import { getCategories, adminMe, getAdminToken, setAdminToken } from './services/api';
 import LoginPage from './components/LoginPage';
 
 // Main App Layout Component (used inside Router)
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   // State Management
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [categories, setCategories] = useState([]);
-  const [Login, setLogin] = useState(true); // Temporarily set to true for debugging
+  const [Login, setLogin] = useState(!!getAdminToken());
+  const [authChecking, setAuthChecking] = useState(true);
   
   // Responsive Design
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -78,6 +82,29 @@ function AppLayout() {
   }, []);
 
   useEffect(() => {
+    const token = getAdminToken();
+    if (!token) {
+      setLogin(false);
+      setAuthChecking(false);
+      return;
+    }
+
+    // Validate token with backend (fast check)
+    adminMe()
+      .then(() => {
+        setLogin(true);
+      })
+      .catch(() => {
+        // Token invalid/expired → log out
+        setAdminToken(null);
+        setLogin(false);
+      })
+      .finally(() => {
+        setAuthChecking(false);
+      });
+  }, []);
+
+  useEffect(() => {
     // Auto-close sidebar on mobile, keep open on desktop
     setSidebarOpen(!isMobile);
   }, [isMobile]);
@@ -108,6 +135,11 @@ function AppLayout() {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const handleLogout = () => {
+    setAdminToken(null);
+    setLogin(false);
+  };
+
   const handleSidebarClose = () => {
     if (isMobile) {
       setSidebarOpen(false);
@@ -116,11 +148,12 @@ function AppLayout() {
   const drawerWidth = 260;
   function submit() {
     setLogin(true);
+    navigate('/dashboard', { replace: true });
   }
 
   return (
     <>
-   {!Login && <LoginPage onLogin={submit} />}
+   {!Login && !authChecking && <LoginPage onLogin={submit} />}
     {Login && <ThemeProvider theme={theme}>
       <CssBaseline />
       
@@ -176,12 +209,14 @@ function AppLayout() {
                 <MenuIcon />
               </IconButton>
 
+              {/* Spacer to push actions to the right */}
+              <Box sx={{ flexGrow: 1 }} />
+
               {/* App Title */}
               <Typography
                 variant="h6"
                 component="div"
                 sx={{
-                  flexGrow: 1,
                   fontWeight: 700,
                   color: 'white',
                   display: { xs: 'block', sm: 'none' },
@@ -204,6 +239,28 @@ function AppLayout() {
               >
                 {darkMode ? <LightIcon /> : <DarkIcon />}
               </IconButton>
+
+              {/* Logout */}
+              <IconButton
+                color="inherit"
+                onClick={handleLogout}
+                aria-label="logout"
+                sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
+              >
+                <LogoutIcon />
+              </IconButton>
+              <Button
+                color="inherit"
+                onClick={handleLogout}
+                startIcon={<LogoutIcon />}
+                sx={{
+                  ml: 1,
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  fontWeight: 600,
+                }}
+              >
+                Logout
+              </Button>
             </Toolbar>
           </AppBar>
 

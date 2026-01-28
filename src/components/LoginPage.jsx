@@ -16,10 +16,11 @@ import {
 } from '@mui/material';
 import { DarkMode, LightMode } from '@mui/icons-material';
 import logo from '../assets/vblogo.png';
+import { adminLogin, setAdminToken } from '../services/api';
 
 const LoginPage = ({ onLogin, toggleTheme }) => {
   const [formData, setFormData] = useState({
-    email: 'secdamngood@gmail.com',
+    email: '',
     password: '',
     rememberMe: false,
   });
@@ -69,14 +70,19 @@ const LoginPage = ({ onLogin, toggleTheme }) => {
     setIsLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      if (formData.email !== 'secdamngood@gmail.com' || formData.password !== '123123') {
+      const result = await adminLogin(formData.email, formData.password);
+      if (!result?.token) {
         setErrors({ submit: 'Login failed. Please try again.' });
         return;
       }
-      onLogin();
+      setAdminToken(result.token);
+      onLogin?.(result.user);
     } catch (error) {
-      setErrors({ submit: 'Login failed. Please try again.' });
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Login failed. Please try again.';
+      setErrors({ submit: message });
       console.error('Login error:', error);
     } finally {
       setIsLoading(false);

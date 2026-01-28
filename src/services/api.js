@@ -3,7 +3,36 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_BASE_FRONTEND_URL || 'http://localhost:5000/api';
 
+export const ADMIN_TOKEN_STORAGE_KEY = 'vb_admin_token';
+
+export function setAdminToken(token) {
+  if (!token) {
+    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    delete axios.defaults.headers.common.Authorization;
+    return;
+  }
+  localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+  axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+}
+
+export function getAdminToken() {
+  return localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+}
+
+// Initialize axios Authorization header from storage
+const existingToken = getAdminToken();
+if (existingToken) {
+  axios.defaults.headers.common.Authorization = `Bearer ${existingToken}`;
+}
+
 export const api = {
+  // Admin Auth
+  adminLogin: (email, password) =>
+    axios
+      .post(`${API_BASE}/admin-auth/login`, { email, password })
+      .then((res) => res.data),
+  adminMe: () => axios.get(`${API_BASE}/admin-auth/me`).then((res) => res.data),
+
   // Categories
   getCategories: () => axios.get(`${API_BASE}/categories`).then(res => res.data),
   createCategory: (data) => axios.post(`${API_BASE}/categories`, data).then(res => res.data),
@@ -64,6 +93,10 @@ export const api = {
 };
 
 export const {
+  // admin auth
+  adminLogin,
+  adminMe,
+
   // categories
   getCategories,
   createCategory,
