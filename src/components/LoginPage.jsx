@@ -5,6 +5,8 @@ import {
   CardContent,
   TextField,
   Button,
+  IconButton,
+  InputAdornment,
   Checkbox,
   FormControlLabel,
   Typography,
@@ -14,7 +16,7 @@ import {
   FormGroup,
   useTheme,
 } from '@mui/material';
-import { DarkMode, LightMode } from '@mui/icons-material';
+import { DarkMode, LightMode, Visibility, VisibilityOff } from '@mui/icons-material';
 import logo from '../assets/vblogo.png';
 import { adminLogin, setAdminToken } from '../services/api';
 
@@ -26,6 +28,7 @@ const LoginPage = ({ onLogin, toggleTheme }) => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const theme = useTheme();
 
   const handleChange = (e) => {
@@ -167,14 +170,28 @@ const LoginPage = ({ onLogin, toggleTheme }) => {
               fullWidth
               label="Password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleChange}
               error={!!errors.password}
               helperText={errors.password}
               placeholder="Enter your password"
               sx={{ mb: 2 }}
-              InputProps={{ sx: { borderRadius: 2 } }}
+              InputProps={{
+                sx: { borderRadius: 2 },
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword((v) => !v)}
+                      edge="end"
+                      aria-label={showPassword ? 'hide password' : 'show password'}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
               disabled={isLoading}
             />
 
